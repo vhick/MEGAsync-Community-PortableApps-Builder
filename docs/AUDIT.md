@@ -39,7 +39,7 @@ Source: `src/MEGASync/MegaApplication.cpp`:
 
 ## Shell/TraceGuard decision
 
-TraceGuard and ShellGuard are intentionally **not implemented** in b1r7. Evidence currently supports direct redirection for main profile but does NOT establish bounded, exact-owned registry keys/files/shortcuts created at runtime. Scavenging guessed keys, wiping Explorer caches or moving pre-existing MEGA AppData would risk installed-app data. CI cannot verify actual shell history or Qt child writes. Do not interpret absent cleanup as 'zero host traces'. A later source- and runtime-evidenced expansion must be tested against owned and pre-existing same-name fixtures before touching host state.
+TraceGuard and ShellGuard are intentionally **not implemented** in b1r8. Evidence currently supports direct redirection for main profile but does NOT establish bounded, exact-owned registry keys/files/shortcuts created at runtime. Scavenging guessed keys, wiping Explorer caches or moving pre-existing MEGA AppData would risk installed-app data. CI cannot verify actual shell history or Qt child writes. Do not interpret absent cleanup as 'zero host traces'. A later source- and runtime-evidenced expansion must be tested against owned and pre-existing same-name fixtures before touching host state.
 
 ## Known external dependencies and behaviors
 
@@ -53,6 +53,13 @@ TraceGuard and ShellGuard are intentionally **not implemented** in b1r7. Evidenc
 
 The `v6.7.1.0_Win` `src/MEGASync/CMakeLists.txt` contains the Windows `MEGAsync` executable definition. The b1r4 compilation log identifies `C2220` from `C4996` / `STL4043` on `stdext::checked_array_iterator` in MSVC headers, in the context of Qt 5.15.2's QList. Add a `PRIVATE` MSVC-only CMake compile definition `_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING` for the `MEGAsync` target, leaving `/WX` enabled. No SDK/crypto logic or generic C4996 disabling. The source adapter is pinned by exact known anchor and fails closed upon drift. Test result: STATIC-VALIDATED local fixtures, Windows build NOT YET VERIFIED.
 
-### b1r7 source-aware dynamic compiler preflight
+### b1r6–b1r8 source-aware dynamic compiler preflight
 
 The fixed b1r5 compatibility source modification is now conditional. `scripts/qt_msvc_probe/probe.cpp` instantiates exactly the Qt Core `QList<QString>::operator==` pattern seen in b1r4 logs. The workflow configures and builds this small independent Windows MSVC project with `/WX` against the installed Qt SDK. A baseline pass means no upstream CMake edit is performed. The program will apply the existing exact-anchor, target-only `_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING` patch only after the baseline log explicitly identifies STL4043/C4996 and a second compile with that definition passes. Removed APIs or unknown errors stop the build. This is evidence-based adaptation for one proven incompatibility, not an unrestricted auto-repair of future source/API changes.
+
+### WindowsApp C++/WinRT link evidence — b1r8
+
+- **SOURCE-INSPECTED:** At exact upstream `v6.7.1.0_Win`, `src/MEGASync/platform/win/DesktopManager.cpp` includes Windows SDK `winrt/Windows.UI.Shell.h` and calls `winrt::try_get_activation_factory` and `winrt::hresult_error`. `src/MEGASync/CMakeLists.txt` defines the Windows `MEGAsync` executable and Qt/SDK libraries but did not explicitly link `WindowsApp`.
+- **WINDOWS-COMPILED (previous b1r7, FAILED/BLOCKED at linking):** `logs_121549679805.zip` ends in two WinRT unresolved symbols from `DesktopManager.obj`. It does not establish runtime success.
+- **Remedy:** Real C++/WinRT WindowsApp link preflight, then a fail-closed, target-only Windows MSVC library addition if upstream has not already added it. No shell feature is removed, no DLLs copied, and no registry/shortcuts changed by this adapter. The Windows SDK import library is a build dependency, not a distributable WindowsApp.dll.
+- **Tradeoff/limitation:** This tests linking, not actual Windows notifications, taskbar pinning, registration, installed-MEGA coexistence, or silent runtime writes. These remain manual acceptance items.

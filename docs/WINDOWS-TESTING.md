@@ -16,3 +16,9 @@ Use a disposable Windows 10/11 test profile and a test MEGA account with **unimp
 12. Compare process/file/registry traces before and after every test, and record differences with owning component. Mark failed evidence and restrict publication unless all contractual requirements pass.
 
 Avoid ProcMon against valuable installed profiles or real cloud data. The native notification, tray, Explorer and sync interactions cannot be reliably proven on a headless GitHub runner.
+
+## WinRT linking and shell behavior (b1r8)
+
+- In GitHub Actions, confirm `Verify WindowsApp C++/WinRT linkage and source adapter` completes with `WINDOWS-COMPILED-LINK-PROBE`, then confirm the full application `MEGAsync.exe` link succeeds independently. The miniature probe must never be presented as a full application build.
+- Confirm portable and separately installed MEGA Desktop applications' tray and notification identities are not mixed. Observe taskbar pin requests and toast click activation under a regular (non-elevated) Windows account. Do not automatically approve shell registration or taskbar pinning.
+- Audit and compare Windows registry, Start Menu, Explorer, and host AppData before/after launch; do not delete ambiguous or pre-existing items. Record remaining traces; these tests cannot run in a headless GitHub Actions job.

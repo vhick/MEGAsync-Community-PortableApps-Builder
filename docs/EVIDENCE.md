@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r7
+# Evidence and verification matrix — kit b1r8
 
 | Stage | Current evidence |
 |---|---|
@@ -11,8 +11,10 @@
 | Stable numeric resolver | STATIC-VALIDATED unit fixtures only |
 | Python scripts syntactically valid | STATIC-VALIDATED in Linux authoring container |
 | Workflow YAML parse | STATIC-VALIDATED in authoring container |
-| Real b1r7 MSVC/Qt preflight compilation | b1r6 WINDOWS-COMPILED-PROBE confirmed: baseline failed STL4043, targeted macro probe passed; b1r7 adapter rerun pending |
-| Actual app Windows compilation | NOT YET VERIFIED |
+| Real b1r7 Qt/MSVC compatibility probe | WINDOWS-COMPILED-PROBE: baseline failed STL4043, targeted macro probe succeeded |
+| Real b1r7 Windows source compilation | WINDOWS-COMPILED (partial): SDK and MEGAsync object compilation progressed; final MEGAsync.exe link FAILED/BLOCKED with WinRT LNK2019 |
+| b1r8 WinRT link preflight | NOT YET VERIFIED on Windows; static fixtures passed locally |
+| Complete b1r8 Windows application build | NOT YET VERIFIED; b1r7 reached final link and failed |
 | Genuine launcher Windows compilation | NOT YET VERIFIED |
 | Startup and login, profile isolation | NOT YET VERIFIED |
 | Real sync/backup behavior | NOT YET VERIFIED |
@@ -28,11 +30,11 @@
 | Desktop appbars, multi-monitor status bars | NOT APPLICABLE |
 | User-confirmed functioning package | NOT YET VERIFIED |
 
-**No Windows compile, real runtime sync, installer execution, or release publication took place during authoring of this kit.** A GitHub-hosted `windows-2022` run is the first real compilation test; an interactive Windows session and controlled MEGA test account are still required for portability claims.
+**No b1r8 Windows compile, real runtime sync, installer execution, or release publication took place during authoring of this kit.** Earlier Windows builds did reach compilation and linking, but did not produce a working application. A GitHub-hosted `windows-2022` run is the first real compilation test; an interactive Windows session and controlled MEGA test account are still required for portability claims.
 
 ## Actual authoring checks run
 
-- `python -m unittest discover -v -s tests` (35 deterministic fixture tests after b1r7 change): PASS on Linux authoring container
+- `python -m unittest discover -v -s tests` (46 deterministic fixture tests after b1r8 change): PASS on Linux authoring container
 - `python scripts/smoke_tests.py`: PASS (static text assertions, not program execution)
 - `python -m compileall -q scripts tests`: PASS
 - `yaml.safe_load` on the two workflows: PASS
@@ -62,10 +64,14 @@ Screenshot shows main workflow listed as `.github/workflows/build-portableapps.y
 
 **SOURCE-INSPECTED:** At official source tag `v6.7.1.0_Win`, `src/MEGASync/CMakeLists.txt` declares `add_executable(MEGAsync WIN32)` and defines compile options for this target. b1r5 adds a `PRIVATE`, `MSVC`-conditional compatibility macro to **that target only** using exact source anchors, preserving `/WX` for unrelated warnings. Static regression fixtures and workflow checks are local only. Windows compilation with b1r5, data containment, live cloud sync, launcher, ZIP/installer, and release publication are **NOT YET VERIFIED**. Another compiler error could surface when the actual build resumes.
 
-## 21 November 2026 b1r7 adaptive compiler preflight
+## 21 November 2026 b1r6/b1r7 adaptive compiler preflight
 
-The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check that runs after Qt is retrieved and before costly vcpkg dependencies. Baseline uses `/WX` and exercises `QList<QString>::operator==`, matching the b1r4 failure. A target-only STL4043 workaround is applied solely if baseline fails with known STL4043/C4996 diagnostics and a second targeted compile succeeds. Missing MSVC APIs and other failures stop. A JSON report accompanies the packaged build. **STATIC-VALIDATED locally only; actual Windows preflight, full Windows application compilation and runtime portability NOT YET VERIFIED.**
+The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check that runs after Qt is retrieved and before costly vcpkg dependencies. Baseline uses `/WX` and exercises `QList<QString>::operator==`, matching the b1r4 failure. A target-only STL4043 workaround is applied solely if baseline fails with known STL4043/C4996 diagnostics and a second targeted compile succeeds. Missing MSVC APIs and other failures stop. A JSON report accompanies the packaged build. **The b1r7 WinRT linker log independently verifies the successful targeted Qt/MSVC preflight and substantial application compilation; b1r8 full linking and runtime portability remain NOT YET VERIFIED.**
 
 ## 21 November 2026 b1r6 Windows diagnostic evidence and b1r7 correction
 
-**AUTOMATED-RUNTIME-TESTED (compiler probe only):** Uploaded `logs_121547965466.zip` and `qt-msvc-compatibility-diagnostics.zip` demonstrate that the real Windows MSVC 19.44 (toolset 14.44.35207), Qt 5.15.2 baseline Qt list-comparison probe failed with STL4043/C4996, while the targeted `_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING` probe compiled successfully. **FAILED/BLOCKED:** the source CMake adapter then rejected the valid second `target_compile_definitions(MEGAsync ...)` statement. `v6.7.1.0_Win/src/MEGASync/CMakeLists.txt` includes a main PUBLIC definition and a conditional PRIVATE CRASH_BACKEND_URL definition inside `if(USE_BREAKPAD)`. b1r7 replaces the over-strict guard with unique Windows target declaration verification and retains fail-closed handling for incompatible target changes. **STATIC-VALIDATED locally only; b1r7 Windows application compilation, launcher runtime, profile containment, ZIP, installer and publication are NOT YET VERIFIED.**
+**AUTOMATED-RUNTIME-TESTED (compiler probe only):** Uploaded `logs_121547965466.zip` and `qt-msvc-compatibility-diagnostics.zip` demonstrate that the real Windows MSVC 19.44 (toolset 14.44.35207), Qt 5.15.2 baseline Qt list-comparison probe failed with STL4043/C4996, while the targeted `_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING` probe compiled successfully. **FAILED/BLOCKED:** the source CMake adapter then rejected the valid second `target_compile_definitions(MEGAsync ...)` statement. `v6.7.1.0_Win/src/MEGASync/CMakeLists.txt` includes a main PUBLIC definition and a conditional PRIVATE CRASH_BACKEND_URL definition inside `if(USE_BREAKPAD)`. b1r7 replaces the over-strict guard with unique Windows target declaration verification and retains fail-closed handling for incompatible target changes. **STATIC-VALIDATED locally only; b1r8 Windows application compilation, launcher runtime, profile containment, ZIP, installer and publication are NOT YET VERIFIED.**
+
+## 21 November 2026 b1r7 Windows linker failure and b1r8 correction
+
+**WINDOWS-COMPILED (partially):** `logs_121549679805.zip` contains a successful Windows Qt/MSVC targeted compatibility probe, successful vcpkg dependencies, MEGA SDK compilation, and a long MEGAsync compile that reached final executable linkage. **FAILED/BLOCKED:** Visual Studio `DesktopManager.obj` produced `LNK2019` for `WINRT_IMPL_RoGetActivationFactory` and `WINRT_IMPL_RoOriginateLanguageException`, followed by `LNK1120` for two unresolved externals. No final MEGAsync executable was produced. Microsoft documents `WindowsApp.lib` as the C++/WinRT umbrella import library. The new b1r8 WindowsApp probe and target-specific source adapter have **STATIC-VALIDATED** fixture coverage only; the *real* Windows link probe, complete application linker, PortableApps ZIP, installer, and end-user behavior are **NOT YET VERIFIED**.

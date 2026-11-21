@@ -139,6 +139,31 @@ jobs:
             out/compiler-compatibility.json
           if-no-files-found: warn
 
+      # Source-inspected DesktopManager.cpp uses WinRT TaskbarManager APIs.
+      # Verify the actual Windows SDK WindowsApp.lib with a real C++/WinRT
+      # compile + link before expensive vcpkg work, then apply a private
+      # target-specific link only when upstream has not already supplied one.
+      - name: Verify WindowsApp C++/WinRT linkage and source adapter
+        id: winrt_probe
+        shell: pwsh
+        run: |
+          python scripts/ensure_winrt_link.py `
+            --source "$env:SOURCE_ROOT" `
+            --work "$(Join-Path $env:RUNNER_TEMP 'mega-winrt-compat')" `
+            --report "$env:KIT_ROOT/out/winrt-link-compatibility.json"
+          if ($LASTEXITCODE -ne 0) { throw 'WindowsApp WinRT link preflight or source patch failed' }
+
+      - name: Upload WinRT linker diagnostic logs if preflight fails
+        if: failure() && steps.winrt_probe.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: winrt-link-compatibility-diagnostics
+          path: |
+            ${{ runner.temp }}/mega-winrt-compat/cmake-configure.log
+            ${{ runner.temp }}/mega-winrt-compat/cmake-build.log
+            out/winrt-link-compatibility.json
+          if-no-files-found: warn
+
       - name: Resolve and record vcpkg dependency manager identity
         shell: pwsh
         env:
@@ -214,7 +239,8 @@ jobs:
             --launcher "$env:KIT_ROOT/launcher-build/Release/MEGAsyncPortable.exe" `
             --qt "$env:MEGA_QT" --tag "$env:UPSTREAM_TAG" --version "$env:APP_VERSION" `
             --sha "$env:UPSTREAM_SHA" --sdk-sha "$env:SDK_SHA" `
-            --vcpkg-sha "$env:VCPKG_SHA" --compat-report "$env:MEGA_COMPAT_REPORT" --out "$env:KIT_ROOT/out"
+            --vcpkg-sha "$env:VCPKG_SHA" --compat-report "$env:MEGA_COMPAT_REPORT" `
+            --winrt-report "$env:KIT_ROOT/out/winrt-link-compatibility.json" --out "$env:KIT_ROOT/out"
           if ($LASTEXITCODE -ne 0) { throw 'ZIP staging or verification failed; installer is blocked' }
           Get-Content 'out/build-outputs.env' | ForEach-Object { $_ >> $env:GITHUB_ENV }
 
@@ -228,7 +254,7 @@ jobs:
           engine: custom-nsis
           running-exe: App/MEGAsync/MEGAsync.exe
           timeout-seconds: '900'
-          package-revision: b1r7
+          package-revision: b1r8
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -268,8 +294,9 @@ jobs:
             out/*.zip
             out/installers/*.exe
             out/compiler-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r7-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r7
+            out/winrt-link-compatibility.json
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r8-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r8
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -283,8 +310,9 @@ jobs:
             out/*.zip
             out/installers/*.exe
             out/compiler-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r7-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r7
+            out/winrt-link-compatibility.json
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r8-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r8
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -294,10 +322,11 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r7-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r8-unpublished
           path: |
             out/*.zip
             out/installers/*.exe
             out/ZIP-SHA256.txt
             out/compiler-compatibility.json
+            out/winrt-link-compatibility.json
           if-no-files-found: error
