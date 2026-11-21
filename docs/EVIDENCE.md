@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r3
+# Evidence and verification matrix — kit b1r4
 
 | Stage | Current evidence |
 |---|---|
@@ -49,3 +49,7 @@ b1r2 removes the vcpkg partial clone and shallow commit fetch, requires a full G
 Uploaded `logs_121516712196.zip` shows successful upstream release resolution, Qt acquisition, full vcpkg checkout (`9967a8eb5f4f5cd7be2b6717d31ddb7ff84c4751`, 31,526 reachable commits) and vcpkg bootstrap. It FAILED during CMake manifest installation of `libsodium:x64-windows-mega@1.0.20#3` with two MSVC `C1083` errors for `pwhash_scryptsalsa208sha256_nosse.c` and `pwhash_scryptsalsa208sha256_sse.c`. Both exist in upstream 1.0.20 source. The uncollapsed relative MSBuild project path was 264 characters under the very long runner checkout root; MAX_PATH is a likely cause, but Windows rerun is needed to confirm.
 
 b1r3 installs vcpkg into short `RUNNER_TEMP\vcpkg`, places source/build/Qt under the same short job-local root, blocks long paths early, passes the exact temp path into CMake, and updates staging to use SDK's `x64-windows-mega` triplet instead of `x64-windows` host-tool triplet. Python fixture tests are STATIC-VALIDATED; Windows compilation, package generation, installer and runtime testing remain NOT YET VERIFIED.
+
+## 21 November 2026 b1r3 GitHub workflow-registration failure / b1r4 change
+
+Screenshot shows main workflow listed as `.github/workflows/build-portableapps.yml` and new failures completing in about one second, while the packaging-only workflow retains its human-readable name. Inspected b1r3 YAML puts `${{ runner.temp }}` in `jobs.build.env`, but GitHub's context availability table excludes `runner` at that location. Thus the workflow is rejected before Windows runner allocation. This is **SOURCE-INSPECTED** local YAML and screenshot-correlated, not an independently fetched GitHub error page. b1r4 initializes `RUNNER_TEMP`-based short paths in a PowerShell step and writes them to `GITHUB_ENV`. A static regression test checks that no job-level env references `runner` and that the initialization happens before application checkout. GitHub dispatch success remains **NOT YET VERIFIED** until the user runs b1r4.

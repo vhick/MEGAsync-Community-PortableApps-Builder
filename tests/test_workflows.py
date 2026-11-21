@@ -23,9 +23,9 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn('PORTABLE_VCPKG_ROOT=$vcpkg', section)
         self.assertIn('-DVCPKG_ROOT="$env:PORTABLE_VCPKG_ROOT"', workflow)
         self.assertNotIn('-DVCPKG_ROOT="$env:KIT_ROOT/vcpkg"', workflow)
-        self.assertIn('SOURCE_ROOT: ${{ runner.temp }}\\mega-src', workflow)
-        self.assertIn('BUILD_ROOT: ${{ runner.temp }}\\mega-build', workflow)
-        self.assertIn('QT_ROOT: ${{ runner.temp }}\\mega-qt', workflow)
+        self.assertIn("SOURCE_ROOT = (Join-Path $root 'mega-src')", workflow)
+        self.assertIn("BUILD_ROOT = (Join-Path $root 'mega-build')", workflow)
+        self.assertIn("QT_ROOT = (Join-Path $root 'mega-qt')", workflow)
 
     def test_packaging_only_accepts_future_revisions(self):
         workflow = (ROOT / '.github' / 'workflows' / 'packaging-only.yml').read_text(encoding='utf-8')
@@ -38,7 +38,7 @@ class WorkflowContracts(unittest.TestCase):
         match = re.search(r"REV='(b1r\d+)'", stage)
         self.assertIsNotNone(match)
         self.assertIn('package-revision: ' + match.group(1), source)
-        self.assertIn('b1r3', match.group(1))
+        self.assertIn('b1r4', match.group(1))
         self.assertNotIn('b1r1', source)
 
 

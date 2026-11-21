@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r3 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r4 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -17,6 +17,12 @@
 - `tests/`: small deterministic **static/fixture** tests; these are not GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
 
+## b1r4 GitHub Actions workflow registration fix
+
+b1r3 introduced three `${{ runner.temp }}` expressions under `jobs.build.env` while shortening vcpkg/Qt/source paths. **GitHub rejects that syntax before allocating a Windows runner**, even though the file passes ordinary YAML parsing. It may display the filename `.github/workflows/build-portableapps.yml` instead of the declared workflow name and fail in approximately one second.
+
+b1r4 keeps the same short paths but initializes `QT_ROOT`, `SOURCE_ROOT` and `BUILD_ROOT` in the first PowerShell step *after checkout*, using Windows' `RUNNER_TEMP` variable. The step writes those values into `GITHUB_ENV` for subsequent steps. Added focused GitHub expression-context regression tests. This fixes the invalid-workflow declaration, **not** the unverified application compilation or runtime portability. Existing failed runs remain in GitHub Actions history.
+
 ## Prerequisites
 
 - A new standalone GitHub repository containing this kit, public or private at your discretion.
@@ -29,7 +35,7 @@
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r3`, commit, then **Push origin**.
+4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r4`, commit, then **Push origin**.
 5. Open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, and ZIP-SHA256.txt. The app package is **not** this builder ZIP.

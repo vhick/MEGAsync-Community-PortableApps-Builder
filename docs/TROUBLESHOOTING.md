@@ -14,3 +14,5 @@
 - **Installer fails after ZIP success:** The workflow preserves the independent ZIP as a diagnostic artifact, marks job failed, and skips publication. Use packaging-only workflow only with the exact original ZIP digest.
 - **Notification failure or host registry traces:** Capture evidence with ProcMon and compare to installed app. Never clean shared keys or existing shortcuts indiscriminately.
 - **Public release issue:** Check MEGA's non-commercial licence, trademark restrictions and dependency notices. The kit never claims official signing or PortableApps certification.
+
+- **Main Actions workflow appears under filename and fails in ~1 second (b1r3):** GitHub Actions workflow parser rejects `${{ runner.temp }}` under `jobs.build.env` (`Unrecognized named-value: 'runner'`). b1r4 moves directory initialization to a job step using `$env:RUNNER_TEMP` and exports paths with `$env:GITHUB_ENV`. A plain YAML parser alone cannot catch this GitHub-specific error. Commit and push the full b1r4 kit before rerunning; old failed attempts remain visible in run history.

@@ -1,6 +1,6 @@
 """Assemble and independently validate the source-built PortableApps ZIP."""
 import argparse, hashlib, json, pathlib, shutil, subprocess, sys, zipfile
-ROOT='MEGAsyncPortable'; REV='b1r3'
+ROOT='MEGAsyncPortable'; REV='b1r4'
 def sha256(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
