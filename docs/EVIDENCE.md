@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r1
+# Evidence and verification matrix — kit b1r2
 
 | Stage | Current evidence |
 |---|---|
@@ -37,3 +37,9 @@
 - `yaml.safe_load` on the two workflows: PASS
 
 SHA-256 of the *builder* ZIP is separately reported with the generated download. Production artifacts and their hashes are not known until the GitHub workflow executes.
+
+## 21 November 2026 b1r1 user-run evidence / b1r2 change
+
+The uploaded GitHub Actions `logs_121512289382.zip` confirmed successful resolver, tag and SDK checkout, portability source patch, Qt acquisition, and vcpkg bootstrap. The Windows CMake configure step **FAILED** while vcpkg loaded historical versioned ports (`ffmpeg`, `openssl`, `sqlite3` and others): `fatal: could not fetch ... from promisor remote`, `Could not resolve host: github.com`. No application or launcher compile was reached.
+
+b1r2 removes the vcpkg partial clone and shallow commit fetch, requires a full Git history, and performs an exact-SHA checkout verification and structural preflight. Local vcpkg Git history tests are STATIC-VALIDATED; **the corrected Windows build remains NOT YET VERIFIED** until a new GitHub Actions run is supplied.

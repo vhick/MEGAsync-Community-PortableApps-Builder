@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r1 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r2 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -12,6 +12,7 @@
 - `scripts/patch_source.py`: fail-closed source adapter for `src/MEGASync/MegaApplication.cpp` `loadDataPath()`; preserves MEGA's native profile ACL routine. Does not tamper with installed MEGA data.
 - `scripts/resolve.py`: numeric Windows stable-release selection; rejects RC/prereleases, non-Windows tags, drafts and missing requested versions.
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
+- `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
 - `tests/`: small deterministic **static/fixture** tests; these are not GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
 
@@ -27,7 +28,7 @@
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r1`, commit, then **Push origin**.
+4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r2`, commit, then **Push origin**.
 5. Open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, and ZIP-SHA256.txt. The app package is **not** this builder ZIP.
@@ -48,7 +49,9 @@ This builder does **not** perform implicit migration from the installed app, doe
 
 ## Testing and trust
 
-The Linux/container-based authoring tests completed: Python syntax, resolver test fixtures, patch fail-closed fixtures, static C++ launcher text checks, and workflow YAML parsing. **Windows application compilation, launcher runtime, Qt dependencies, GUI, notifications, actual sync, installer use and release publication have NOT been performed in this environment.** See `docs/EVIDENCE.md`.
+This b1r2 revision fixes the b1r1 GitHub Actions failure logged on 21 Nov 2026: vcpkg was obtained with `--filter=blob:none`, causing on-demand historical port Git object downloads to fail when GitHub DNS was unavailable. It now uses `git clone --no-single-branch` (full history), checks SHA and non-partial/non-shallow status before CMake. A network outage while fetching the full clone can still fail, but no CMake work is attempted until the clone is structurally verified.
+
+The Linux/container-based authoring tests completed: Python syntax, resolver test fixtures, patch fail-closed fixtures, vcpkg Git history fixtures, static C++ launcher text checks, and workflow YAML parsing. **Windows application compilation, launcher runtime, Qt dependencies, GUI, notifications, actual sync, installer use and release publication have NOT been performed in this environment.** See `docs/EVIDENCE.md`.
 
 **Critical limitations:** MEGA Desktop upstream has an app-specific restrictive **non-commercial** source licence, not an ordinary open-source licence. Custom community cloud icon is included in place of MEGA's trademarked logo. The application itself may still contain MEGA's official assets, so redistribution rights and branding require independent review. Shell/runtime traces, integrated updater and framework caches are not fully audited with runtime evidence. If any unexpected host modification occurs, stop and file evidence before using this build with valuable synced files.
 

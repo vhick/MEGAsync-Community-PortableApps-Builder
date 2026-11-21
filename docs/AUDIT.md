@@ -39,7 +39,7 @@ Source: `src/MEGASync/MegaApplication.cpp`:
 
 ## Shell/TraceGuard decision
 
-TraceGuard and ShellGuard are intentionally **not implemented** in b1r1. Evidence currently supports direct redirection for main profile but does NOT establish bounded, exact-owned registry keys/files/shortcuts created at runtime. Scavenging guessed keys, wiping Explorer caches or moving pre-existing MEGA AppData would risk installed-app data. CI cannot verify actual shell history or Qt child writes. Do not interpret absent cleanup as 'zero host traces'. A later source- and runtime-evidenced expansion must be tested against owned and pre-existing same-name fixtures before touching host state.
+TraceGuard and ShellGuard are intentionally **not implemented** in b1r2. Evidence currently supports direct redirection for main profile but does NOT establish bounded, exact-owned registry keys/files/shortcuts created at runtime. Scavenging guessed keys, wiping Explorer caches or moving pre-existing MEGA AppData would risk installed-app data. CI cannot verify actual shell history or Qt child writes. Do not interpret absent cleanup as 'zero host traces'. A later source- and runtime-evidenced expansion must be tested against owned and pre-existing same-name fixtures before touching host state.
 
 ## Known external dependencies and behaviors
 

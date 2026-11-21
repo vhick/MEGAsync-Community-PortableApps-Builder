@@ -98,20 +98,34 @@ jobs:
         env:
           REQUESTED_VCPKG_COMMIT: ${{ inputs.vcpkg_commit }}
         run: |
-          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:KIT_ROOT/vcpkg"
-          if ($LASTEXITCODE -ne 0) { throw 'vcpkg clone failed' }
-          $requested=$env:REQUESTED_VCPKG_COMMIT.Trim()
+          # vcpkg's versioned port records reference historical Git tree objects.
+          # Do NOT use --filter=blob:none, --depth, --single-branch or a ZIP archive.
+          # A partial clone may lazily fetch each missing object during CMake configure;
+          # transient GitHub DNS/network errors then fail many unrelated ports.
+          $vcpkg = Join-Path $env:KIT_ROOT 'vcpkg'
+          $requested = $env:REQUESTED_VCPKG_COMMIT.Trim()
+          if ($requested -and $requested -notmatch '^[0-9a-fA-F]{40}$') {
+            throw 'vcpkg override must be an exact 40-character SHA'
+          }
+          git clone --no-single-branch https://github.com/microsoft/vcpkg.git "$vcpkg"
+          if ($LASTEXITCODE -ne 0) { throw 'Full-history vcpkg clone failed (network/DNS/host issue)' }
           if ($requested) {
-            if ($requested -notmatch '^[0-9a-fA-F]{40}$') { throw 'vcpkg override must be 40-char immutable SHA' }
-            git -C "$env:KIT_ROOT/vcpkg" fetch --depth=1 origin $requested
-            if ($LASTEXITCODE -ne 0) { throw 'Exact vcpkg SHA fetch failed' }
-            git -C "$env:KIT_ROOT/vcpkg" checkout --detach $requested
+            git -C "$vcpkg" cat-file -e "${requested}^{commit}"
+            if ($LASTEXITCODE -ne 0) {
+              # An explicit commit may be reachable by a non-default ref. Fetch
+              # it without a shallow/partial filter, never silently use HEAD.
+              git -C "$vcpkg" fetch --no-tags origin "$requested"
+              if ($LASTEXITCODE -ne 0) { throw 'Requested vcpkg commit cannot be fetched' }
+            }
+            git -C "$vcpkg" checkout --detach "$requested"
             if ($LASTEXITCODE -ne 0) { throw 'Exact vcpkg SHA checkout failed' }
           }
-          $sha=(git -C "$env:KIT_ROOT/vcpkg" rev-parse HEAD).Trim()
+          $sha = (git -C "$vcpkg" rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') { throw 'Invalid vcpkg source SHA' }
+          python scripts/verify_vcpkg_checkout.py --repo "$vcpkg" --sha "$sha"
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg Git history/object preflight failed; stop before expensive CMake work' }
           "VCPKG_SHA=$sha" >> $env:GITHUB_ENV
-          & "$env:KIT_ROOT/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          & "$vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }
 
       - name: Build actual MEGA Desktop application from pinned source
@@ -159,7 +173,7 @@ jobs:
           engine: custom-nsis
           running-exe: App/MEGAsync/MEGAsync.exe
           timeout-seconds: '900'
-          package-revision: b1r1
+          package-revision: b1r2
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -198,8 +212,8 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r1-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r1
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r2-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r2
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -212,8 +226,8 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r1-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r1
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r2-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r2
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -223,7 +237,7 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r1-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r2-unpublished
           path: |
             out/*.zip
             out/installers/*.exe
