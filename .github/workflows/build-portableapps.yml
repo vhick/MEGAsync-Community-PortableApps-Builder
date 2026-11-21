@@ -30,9 +30,11 @@ jobs:
       PYTHONUTF8: '1'
       PYTHONIOENCODING: utf-8
       GIT_TERMINAL_PROMPT: '0'
-      QT_ROOT: ${{ github.workspace }}\Qt
-      SOURCE_ROOT: ${{ github.workspace }}\upstream
-      BUILD_ROOT: ${{ github.workspace }}\build
+      # Keep GitHub's long RepoName/RepoName checkout only for builder scripts.
+      # Third-party source, Qt and CMake builds use job-local short paths.
+      QT_ROOT: ${{ runner.temp }}\mega-qt
+      SOURCE_ROOT: ${{ runner.temp }}\mega-src
+      BUILD_ROOT: ${{ runner.temp }}\mega-build
       KIT_ROOT: ${{ github.workspace }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -102,7 +104,15 @@ jobs:
           # Do NOT use --filter=blob:none, --depth, --single-branch or a ZIP archive.
           # A partial clone may lazily fetch each missing object during CMake configure;
           # transient GitHub DNS/network errors then fail many unrelated ports.
-          $vcpkg = Join-Path $env:KIT_ROOT 'vcpkg'
+          # MSBuild compiles libsodium using project-relative paths. Long
+          # GitHub workspace repo names can exceed MAX_PATH even with valid
+          # files (the b1r3 failure used a 264-character uncollapsed path).
+          # Use the runner's job-unique, short, disposable temp directory.
+          if (-not $env:RUNNER_TEMP) { throw 'RUNNER_TEMP is unavailable' }
+          $vcpkg = Join-Path $env:RUNNER_TEMP 'vcpkg'
+          python scripts/verify_vcpkg_path.py --root "$vcpkg"
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg path is too long for legacy MSBuild dependencies' }
+          if (Test-Path -LiteralPath $vcpkg) { throw 'Refusing to reuse a pre-existing vcpkg checkout in RUNNER_TEMP' }
           $requested = $env:REQUESTED_VCPKG_COMMIT.Trim()
           if ($requested -and $requested -notmatch '^[0-9a-fA-F]{40}$') {
             throw 'vcpkg override must be an exact 40-character SHA'
@@ -125,6 +135,7 @@ jobs:
           python scripts/verify_vcpkg_checkout.py --repo "$vcpkg" --sha "$sha"
           if ($LASTEXITCODE -ne 0) { throw 'vcpkg Git history/object preflight failed; stop before expensive CMake work' }
           "VCPKG_SHA=$sha" >> $env:GITHUB_ENV
+          "PORTABLE_VCPKG_ROOT=$vcpkg" >> $env:GITHUB_ENV
           & "$vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }
 
@@ -132,7 +143,7 @@ jobs:
         shell: pwsh
         run: |
           cmake -G 'Visual Studio 17 2022' -A x64 `
-            -DVCPKG_ROOT="$env:KIT_ROOT/vcpkg" `
+            -DVCPKG_ROOT="$env:PORTABLE_VCPKG_ROOT" `
             -DCMAKE_PREFIX_PATH="$env:MEGA_QT" `
             -DENABLE_DESIGN_TOKENS_IMPORTER=OFF `
             -DENABLE_DESKTOP_APP_TESTS=OFF `
@@ -173,7 +184,7 @@ jobs:
           engine: custom-nsis
           running-exe: App/MEGAsync/MEGAsync.exe
           timeout-seconds: '900'
-          package-revision: b1r2
+          package-revision: b1r3
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -212,8 +223,8 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r2-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r2
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r3-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r3
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -226,8 +237,8 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r2-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r2
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r3-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r3
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -237,7 +248,7 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r2-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r3-unpublished
           path: |
             out/*.zip
             out/installers/*.exe

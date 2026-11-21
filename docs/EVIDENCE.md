@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r2
+# Evidence and verification matrix — kit b1r3
 
 | Stage | Current evidence |
 |---|---|
@@ -43,3 +43,9 @@ SHA-256 of the *builder* ZIP is separately reported with the generated download.
 The uploaded GitHub Actions `logs_121512289382.zip` confirmed successful resolver, tag and SDK checkout, portability source patch, Qt acquisition, and vcpkg bootstrap. The Windows CMake configure step **FAILED** while vcpkg loaded historical versioned ports (`ffmpeg`, `openssl`, `sqlite3` and others): `fatal: could not fetch ... from promisor remote`, `Could not resolve host: github.com`. No application or launcher compile was reached.
 
 b1r2 removes the vcpkg partial clone and shallow commit fetch, requires a full Git history, and performs an exact-SHA checkout verification and structural preflight. Local vcpkg Git history tests are STATIC-VALIDATED; **the corrected Windows build remains NOT YET VERIFIED** until a new GitHub Actions run is supplied.
+
+## 21 November 2026 b1r2 user-run evidence / b1r3 change
+
+Uploaded `logs_121516712196.zip` shows successful upstream release resolution, Qt acquisition, full vcpkg checkout (`9967a8eb5f4f5cd7be2b6717d31ddb7ff84c4751`, 31,526 reachable commits) and vcpkg bootstrap. It FAILED during CMake manifest installation of `libsodium:x64-windows-mega@1.0.20#3` with two MSVC `C1083` errors for `pwhash_scryptsalsa208sha256_nosse.c` and `pwhash_scryptsalsa208sha256_sse.c`. Both exist in upstream 1.0.20 source. The uncollapsed relative MSBuild project path was 264 characters under the very long runner checkout root; MAX_PATH is a likely cause, but Windows rerun is needed to confirm.
+
+b1r3 installs vcpkg into short `RUNNER_TEMP\vcpkg`, places source/build/Qt under the same short job-local root, blocks long paths early, passes the exact temp path into CMake, and updates staging to use SDK's `x64-windows-mega` triplet instead of `x64-windows` host-tool triplet. Python fixture tests are STATIC-VALIDATED; Windows compilation, package generation, installer and runtime testing remain NOT YET VERIFIED.

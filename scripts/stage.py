@@ -1,6 +1,6 @@
 """Assemble and independently validate the source-built PortableApps ZIP."""
 import argparse, hashlib, json, pathlib, shutil, subprocess, sys, zipfile
-ROOT='MEGAsyncPortable'; REV='b1r2'
+ROOT='MEGAsyncPortable'; REV='b1r3'
 def sha256(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
@@ -12,6 +12,14 @@ def pe_kind(path):
         f.seek(0x3c); offset=int.from_bytes(f.read(4),'little');f.seek(offset)
         if f.read(4)!=b'PE\0\0':raise ValueError('Missing PE signature: '+str(path))
         return int.from_bytes(f.read(2),'little')
+def find_mega_runtime_bin(build, source):
+    checked=[]
+    for base in (build,source):
+        candidate=base/'vcpkg_installed'/'x64-windows-mega'/'bin'
+        checked.append(str(candidate))
+        if candidate.is_dir():
+            return candidate
+    raise RuntimeError('Cannot locate MEGA x64-windows-mega runtime DLL directory; inspected '+', '.join(checked))
 def main():
     ap=argparse.ArgumentParser()
     for field in ('source','build','launcher','qt','tag','version','sha','sdk-sha','vcpkg-sha','out'):
@@ -35,12 +43,12 @@ def main():
     # Deployment may need Qt plugins and QML tree; keep every reported failure fatal.
     command=[str(deploy),'--release','--compiler-runtime','--qmldir',str(pathlib.Path(a.source)/'src'/'MEGASync'),str(app/'MEGAsync.exe')]
     subprocess.run(command,check=True,timeout=1800)
-    # vcpkg defaults to dynamic x64-windows; deployment of those runtime DLLs
-    # is separate from Qt's windeployqt and must be contained in App/MEGAsync.
-    vcpkgbins=pathlib.Path(a.build)/'vcpkg_installed'/'x64-windows'/'bin'
-    if not vcpkgbins.is_dir():
-        vcpkgbins=pathlib.Path(a.source)/'vcpkg_installed'/'x64-windows'/'bin'
-    if not vcpkgbins.is_dir():raise RuntimeError('Cannot locate compiled vcpkg dynamic dependency DLLs')
+    # The MEGA SDK's Windows target triplet is x64-windows-mega, NOT the
+    # host-tools x64-windows triplet. Its overlay builds most ports static but
+    # ffmpeg dynamic. Never silently copy host-triplet DLLs into the app.
+    # Source/build are both considered because upstream may change its
+    # manifest installed-directory layout between tagged releases.
+    vcpkgbins=find_mega_runtime_bin(pathlib.Path(a.build),pathlib.Path(a.source))
     for dll in vcpkgbins.glob('*.dll'):
         target=app/dll.name
         if target.exists() and sha256(target)!=sha256(dll):

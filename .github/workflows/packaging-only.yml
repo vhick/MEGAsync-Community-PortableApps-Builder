@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       installer_package_revision:
-        description: 'New installer-only revision, e.g. b1r2'
+        description: 'New installer-only revision, e.g. b1r3'
         required: true
         default: b1r3
         type: string

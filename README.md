@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r2 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r3 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -12,6 +12,7 @@
 - `scripts/patch_source.py`: fail-closed source adapter for `src/MEGASync/MegaApplication.cpp` `loadDataPath()`; preserves MEGA's native profile ACL routine. Does not tamper with installed MEGA data.
 - `scripts/resolve.py`: numeric Windows stable-release selection; rejects RC/prereleases, non-Windows tags, drafts and missing requested versions.
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
+- `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
 - `tests/`: small deterministic **static/fixture** tests; these are not GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
@@ -28,7 +29,7 @@
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r2`, commit, then **Push origin**.
+4. In GitHub Desktop check all files, enter commit summary `Add MEGA Desktop Community PortableApps Builder b1r3`, commit, then **Push origin**.
 5. Open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, and ZIP-SHA256.txt. The app package is **not** this builder ZIP.
@@ -49,7 +50,9 @@ This builder does **not** perform implicit migration from the installed app, doe
 
 ## Testing and trust
 
-This b1r2 revision fixes the b1r1 GitHub Actions failure logged on 21 Nov 2026: vcpkg was obtained with `--filter=blob:none`, causing on-demand historical port Git object downloads to fail when GitHub DNS was unavailable. It now uses `git clone --no-single-branch` (full history), checks SHA and non-partial/non-shallow status before CMake. A network outage while fetching the full clone can still fail, but no CMake work is attempted until the clone is structurally verified.
+The earlier b1r2 revision fixed the b1r1 GitHub Actions failure logged on 21 Nov 2026: vcpkg was obtained with `--filter=blob:none`, causing on-demand historical port Git object downloads to fail when GitHub DNS was unavailable. It now uses `git clone --no-single-branch` (full history), checks SHA and non-partial/non-shallow status before CMake. A network outage while fetching the full clone can still fail, but no CMake work is attempted until the clone is structurally verified.
+
+b1r3 addresses the subsequent `logs_121516712196.zip` failure: libsodium 1.0.20#3 MSBuild could not open two C sources. The failing uncollapsed compiler path is 264 characters long under GitHub's `D:\a\Repo\Repo` checkout. b1r3 puts the full-history vcpkg checkout into the job-local short `RUNNER_TEMP\vcpkg` and keeps upstream source/Qt/build directories under the short runner temp root, performs a strict path-length preflight before clone, retains exact vcpkg SHA verification, and uses the source-evidenced `x64-windows-mega` target triplet when staging DLLs. Windows verification is still pending.
 
 The Linux/container-based authoring tests completed: Python syntax, resolver test fixtures, patch fail-closed fixtures, vcpkg Git history fixtures, static C++ launcher text checks, and workflow YAML parsing. **Windows application compilation, launcher runtime, Qt dependencies, GUI, notifications, actual sync, installer use and release publication have NOT been performed in this environment.** See `docs/EVIDENCE.md`.
 
