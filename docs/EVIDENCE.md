@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r4
+# Evidence and verification matrix — kit b1r6
 
 | Stage | Current evidence |
 |---|---|
@@ -11,6 +11,7 @@
 | Stable numeric resolver | STATIC-VALIDATED unit fixtures only |
 | Python scripts syntactically valid | STATIC-VALIDATED in Linux authoring container |
 | Workflow YAML parse | STATIC-VALIDATED in authoring container |
+| Real b1r6 MSVC/Qt preflight compilation | NOT YET VERIFIED (31 local fixture/static tests passed) |
 | Actual app Windows compilation | NOT YET VERIFIED |
 | Genuine launcher Windows compilation | NOT YET VERIFIED |
 | Startup and login, profile isolation | NOT YET VERIFIED |
@@ -31,7 +32,7 @@
 
 ## Actual authoring checks run
 
-- `python -m unittest discover -v -s tests` (4 fixtures): PASS
+- `python -m unittest discover -v -s tests` (31 deterministic fixture tests): PASS on Linux authoring container
 - `python scripts/smoke_tests.py`: PASS (static text assertions, not program execution)
 - `python -m compileall -q scripts tests`: PASS
 - `yaml.safe_load` on the two workflows: PASS
@@ -53,3 +54,14 @@ b1r3 installs vcpkg into short `RUNNER_TEMP\vcpkg`, places source/build/Qt under
 ## 21 November 2026 b1r3 GitHub workflow-registration failure / b1r4 change
 
 Screenshot shows main workflow listed as `.github/workflows/build-portableapps.yml` and new failures completing in about one second, while the packaging-only workflow retains its human-readable name. Inspected b1r3 YAML puts `${{ runner.temp }}` in `jobs.build.env`, but GitHub's context availability table excludes `runner` at that location. Thus the workflow is rejected before Windows runner allocation. This is **SOURCE-INSPECTED** local YAML and screenshot-correlated, not an independently fetched GitHub error page. b1r4 initializes `RUNNER_TEMP`-based short paths in a PowerShell step and writes them to `GITHUB_ENV`. A static regression test checks that no job-level env references `runner` and that the initialization happens before application checkout. GitHub dispatch success remains **NOT YET VERIFIED** until the user runs b1r4.
+
+## 21 November 2026 b1r4 MEGAsync compilation error / b1r5 change
+
+**WINDOWS-COMPILED (partial, user-provided log; application target FAILED):**
+`logs_121526272643.zip` captures a real Windows GitHub Actions run. The CMake configuration and a substantial source build progressed through the SDK, and the first fatal source-build diagnostic was `C2220` in `MEGAsync.vcxproj` when compiling `src/MEGASync/syncs/control/MegaIgnoreManager.cpp`. The real underlying warning was `C4996` / `STL4043` caused by Qt 5.15.2 `QStringList`/`QList` using MSVC's deprecated `stdext::checked_array_iterator` in `xutility`. The MSVC warning itself specifically recommends `_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING`.
+
+**SOURCE-INSPECTED:** At official source tag `v6.7.1.0_Win`, `src/MEGASync/CMakeLists.txt` declares `add_executable(MEGAsync WIN32)` and defines compile options for this target. b1r5 adds a `PRIVATE`, `MSVC`-conditional compatibility macro to **that target only** using exact source anchors, preserving `/WX` for unrelated warnings. Static regression fixtures and workflow checks are local only. Windows compilation with b1r5, data containment, live cloud sync, launcher, ZIP/installer, and release publication are **NOT YET VERIFIED**. Another compiler error could surface when the actual build resumes.
+
+## 21 November 2026 b1r6 adaptive compiler preflight
+
+The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check that runs after Qt is retrieved and before costly vcpkg dependencies. Baseline uses `/WX` and exercises `QList<QString>::operator==`, matching the b1r4 failure. A target-only STL4043 workaround is applied solely if baseline fails with known STL4043/C4996 diagnostics and a second targeted compile succeeds. Missing MSVC APIs and other failures stop. A JSON report accompanies the packaged build. **STATIC-VALIDATED locally only; actual Windows preflight, full Windows application compilation and runtime portability NOT YET VERIFIED.**

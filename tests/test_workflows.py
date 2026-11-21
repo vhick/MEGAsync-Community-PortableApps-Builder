@@ -38,7 +38,7 @@ class WorkflowContracts(unittest.TestCase):
         match = re.search(r"REV='(b1r\d+)'", stage)
         self.assertIsNotNone(match)
         self.assertIn('package-revision: ' + match.group(1), source)
-        self.assertIn('b1r4', match.group(1))
+        self.assertIn('b1r6', match.group(1))
         self.assertNotIn('b1r1', source)
 
 

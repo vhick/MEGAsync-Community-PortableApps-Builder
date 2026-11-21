@@ -1,6 +1,6 @@
 """Assemble and independently validate the source-built PortableApps ZIP."""
 import argparse, hashlib, json, pathlib, shutil, subprocess, sys, zipfile
-ROOT='MEGAsyncPortable'; REV='b1r4'
+ROOT='MEGAsyncPortable'; REV='b1r6'
 def sha256(p):
     h=hashlib.sha256()
     with open(p,'rb') as f:
@@ -22,7 +22,7 @@ def find_mega_runtime_bin(build, source):
     raise RuntimeError('Cannot locate MEGA x64-windows-mega runtime DLL directory; inspected '+', '.join(checked))
 def main():
     ap=argparse.ArgumentParser()
-    for field in ('source','build','launcher','qt','tag','version','sha','sdk-sha','vcpkg-sha','out'):
+    for field in ('source','build','launcher','qt','tag','version','sha','sdk-sha','vcpkg-sha','compat-report','out'):
         ap.add_argument('--'+field,required=True)
     a=ap.parse_args(); out=pathlib.Path(a.out);out.mkdir(parents=True,exist_ok=True)
     stage=out/ROOT
@@ -95,9 +95,19 @@ BaseAppID=MEGAsyncCommunityPortable
         shutil.copy2(src,others/name)
     shutil.copy2(pathlib.Path(__file__).parents[1]/'launcher'/'main.cpp',others/'CommunityLauncher.cpp')
     (others/'PORTABILITY-LIMITS.txt').write_text('WARNING: Only source data-path redirection is implemented. Native Explorer extension, update, Qt and OS traces remain unverified. Use NTFS/ReFS. Check sync folder destinations before connecting. No signed or official status is claimed.\n',encoding='utf-8')
+    # Real compile-probe evidence is included verbatim for auditability.
+    report_file=pathlib.Path(a.compat_report)
+    if not report_file.is_file():raise RuntimeError('Compiler compatibility report missing')
+    report=json.loads(report_file.read_text(encoding='utf-8'))
+    if report.get('revision')!=REV or report.get('status')!='WINDOWS-COMPILED-PROBE':
+        raise RuntimeError('Compiler preflight report is invalid or unsuccessful')
+    if report.get('mode') not in ('unchanged','target-only-stl4043'):
+        raise RuntimeError('Unrecognized Qt/MSVC compatibility mode')
+    shutil.copy2(report_file,others/'COMPILER-COMPATIBILITY.json')
     identity={ 'upstream_tag':a.tag,'upstream_commit':a.sha,'sdk_submodule_commit':a.sdk_sha,
         'vcpkg_commit':a.vcpkg_sha,'source_build':True,'launcher':'C++/MSVC','arch':'x64',
-        'qt':str(qt),'kit_revision':REV,'portable_profile_env':'MEGA_PORTABLE_DATA_DIR',
+        'qt':str(qt),'kit_revision':REV,'compiler_compatibility_mode':report['mode'],
+        'compiler_probe_toolchain':report.get('toolchain', {}),'portable_profile_env':'MEGA_PORTABLE_DATA_DIR',
         'portable_source_patch':'MegaApplication::loadDataPath()','runtime_validation':'NOT YET VERIFIED'}
     (others/'BUILD-IDENTITY.json').write_text(json.dumps(identity,indent=2,ensure_ascii=False),encoding='utf-8')
     zipname=f'MEGAsyncPortable_{a.version}_{REV}_x64.zip';dest=out/zipname

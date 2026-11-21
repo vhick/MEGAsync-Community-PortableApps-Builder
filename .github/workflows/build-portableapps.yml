@@ -113,6 +113,32 @@ jobs:
           if (-not (Test-Path (Join-Path $qt 'bin/windeployqt.exe'))) { throw 'Qt SDK layout was not verified' }
           "MEGA_QT=$qt" >> $env:GITHUB_ENV
 
+      # Compile the exact Qt QList<QString> comparison with the ACTUAL runner
+      # compiler and the downloaded Qt SDK, with /WX intact.  Only the exact
+      # STL4043 failure permits a second targeted trial and verified patch.
+      # This avoids unconditional source modifications and fails on removed APIs.
+      - name: Detect Qt/MSVC compatibility using real C++ compile probes
+        id: compiler_probe
+        shell: pwsh
+        run: |
+          python scripts/detect_msvc_qt_compat.py `
+            --qt "$env:MEGA_QT" --source "$env:SOURCE_ROOT" `
+            --work "$(Join-Path $env:RUNNER_TEMP 'mega-qt-compat')" `
+            --report "$env:KIT_ROOT/out/compiler-compatibility.json" `
+            --env "$env:GITHUB_ENV"
+          if ($LASTEXITCODE -ne 0) { throw 'Dynamic Qt/MSVC preflight failed; no unverified compatibility workaround applied' }
+
+      - name: Upload diagnostic logs when compiler preflight fails
+        if: failure() && steps.compiler_probe.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-msvc-compatibility-diagnostics
+          path: |
+            ${{ runner.temp }}/mega-qt-compat/**/cmake-configure.log
+            ${{ runner.temp }}/mega-qt-compat/**/cmake-build.log
+            out/compiler-compatibility.json
+          if-no-files-found: warn
+
       - name: Resolve and record vcpkg dependency manager identity
         shell: pwsh
         env:
@@ -188,7 +214,7 @@ jobs:
             --launcher "$env:KIT_ROOT/launcher-build/Release/MEGAsyncPortable.exe" `
             --qt "$env:MEGA_QT" --tag "$env:UPSTREAM_TAG" --version "$env:APP_VERSION" `
             --sha "$env:UPSTREAM_SHA" --sdk-sha "$env:SDK_SHA" `
-            --vcpkg-sha "$env:VCPKG_SHA" --out "$env:KIT_ROOT/out"
+            --vcpkg-sha "$env:VCPKG_SHA" --compat-report "$env:MEGA_COMPAT_REPORT" --out "$env:KIT_ROOT/out"
           if ($LASTEXITCODE -ne 0) { throw 'ZIP staging or verification failed; installer is blocked' }
           Get-Content 'out/build-outputs.env' | ForEach-Object { $_ >> $env:GITHUB_ENV }
 
@@ -202,7 +228,7 @@ jobs:
           engine: custom-nsis
           running-exe: App/MEGAsync/MEGAsync.exe
           timeout-seconds: '900'
-          package-revision: b1r4
+          package-revision: b1r6
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -241,8 +267,9 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r4-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r4
+            out/compiler-compatibility.json
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r6-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r6
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -255,8 +282,9 @@ jobs:
           files: |
             out/*.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r4-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r4
+            out/compiler-compatibility.json
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r6-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r6
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -266,9 +294,10 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r4-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r6-unpublished
           path: |
             out/*.zip
             out/installers/*.exe
             out/ZIP-SHA256.txt
+            out/compiler-compatibility.json
           if-no-files-found: error
