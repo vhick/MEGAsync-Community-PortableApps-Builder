@@ -62,14 +62,53 @@ class MsvcQtCompatPatchTests(unittest.TestCase):
                 module.patch(root)
             self.assertEqual(before, target.read_bytes())
 
-    def test_changed_upstream_definitions_rejected(self):
+    def test_real_upstream_two_compile_definitions_are_supported(self):
+        # v6.7.1.0_Win src/MEGASync/CMakeLists.txt has a PUBLIC definition
+        # plus a PRIVATE CRASH_BACKEND_URL definition inside USE_BREAKPAD.
+        upstream = SAMPLE + '''
+if(USE_BREAKPAD)
+    target_compile_definitions(MEGAsync PRIVATE CRASH_BACKEND_URL="${CRASH_BACKEND_URL}")
+endif()
+'''
         with TemporaryDirectory() as temp:
             root = Path(temp)
-            target = self.make_file(root, SAMPLE.replace('target_compile_definitions(MEGAsync', '# target_compile_definitions absent'))
+            target = self.make_file(root, upstream)
+            module.patch(root)
+            after = target.read_text(encoding='utf-8')
+            self.assertEqual(after.count('target_compile_definitions(MEGAsync'), 3)
+            self.assertEqual(after.count(module.DEFINITION), 1)
+            self.assertIn('target_compile_definitions(MEGAsync PRIVATE CRASH_BACKEND_URL=', after)
+            self.assertIn('target_compile_definitions(MEGAsync\n    PUBLIC', after)
+            self.assertNotIn('/WX-', after)
+
+    def test_formatting_variation_does_not_break_valid_target(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            variant = SAMPLE.replace('if (WIN32)\n    add_executable(MEGAsync WIN32)',
+                                     'if( WIN32 )\n  add_executable ( MEGAsync WIN32 )')
+            target = self.make_file(root, variant)
+            module.patch(root)
+            self.assertEqual(target.read_text().count(module.DEFINITION), 1)
+
+    def test_comment_cannot_fake_windows_executable_target(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            invalid = SAMPLE.replace('    add_executable(MEGAsync WIN32)', '    # add_executable(MEGAsync WIN32)')
+            target = self.make_file(root, invalid)
             before = target.read_bytes()
-            with self.assertRaisesRegex(RuntimeError, 'compile-definition structure changed'):
+            with self.assertRaisesRegex(RuntimeError, 'declaration changed'):
                 module.patch(root)
             self.assertEqual(before, target.read_bytes())
+
+    def test_multiple_windows_target_declarations_rejected(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = self.make_file(root, SAMPLE + '\nif(WIN32)\n add_executable(MEGAsync WIN32)\nendif()\n')
+            before = target.read_bytes()
+            with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                module.patch(root)
+            self.assertEqual(before, target.read_bytes())
+
 
 
 if __name__ == '__main__':

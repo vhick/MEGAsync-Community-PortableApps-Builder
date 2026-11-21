@@ -3,9 +3,15 @@
 Suggested repository: `MEGAsync-Community-PortableApps-Builder` (independent of upstream).
 
 Commit summary:
-`Add adaptive MSVC Qt compiler preflight - b1r6`
+`Fix adaptive CMake target validation - b1r7`
 
 Description:
-`Add stable Windows release resolution, exact-tag/SDK checkout, fail-closed MEGA source data-path override, compiled C++ PortableApps launcher, reproducible build identities, source compilation, Qt deployment, ZIP validation, shared custom-NSIS installer, publisher dry-run/opt-in releases, trusted packaging-only workflow, and documented data safety and unverified Windows acceptance requirements.`
+`Fix the b1r6 adaptive Qt/MSVC compatibility preflight source-patch failure.
+
+The real Windows compiler baseline reports STL4043/C4996, and the targeted compatibility probe succeeds. Official MEGAsync v6.7.1.0_Win defines target_compile_definitions(MEGAsync) twice: one general PUBLIC block and one optional Breakpad PRIVATE block.
+
+Replace the incorrect exactly-one-definition guard with validation of the unique Windows MEGAsync executable declaration. Add a conditional target-private fix only when the real compiler probe requires it. Preserve upstream Breakpad settings, /WX, the source-built portable-data adapter, vcpkg improvements, launcher, installer and release publisher.
+
+Add exact-upstream dual-definition fixtures, drift protection and regression tests. Update builder/release revision to b1r7. Windows compilation and runtime portability remain unverified.`
 
 The first build MUST be unpublished and evaluated on a disposable test account. See README and WINDOWS-TESTING.md.

@@ -1,24 +1,24 @@
-"""Conditionally applied MEGAsync-only MSVC STL4043 compatibility adapter.
+"""Source-inspected, fail-closed MEGAsync-only MSVC STL4043 compatibility adapter.
 
-Invoke ONLY after a real Qt/MSVC compile probe proves that the same code fails
-with STL4043 and passes with the target-specific suppression. Never disable /WX.
+Only called after real /WX Qt/MSVC probes establish both the specific warning
+and that the exact macro fixes it.  The upstream target may legitimately have
+MULTIPLE target_compile_definitions() calls (including USE_BREAKPAD); these are
+not an indicator of CMake drift and must remain untouched.
 """
 import argparse
+import re
 from pathlib import Path
 
 TARGET = Path('src/MEGASync/CMakeLists.txt')
-ANCHOR = 'if (WIN32)\n    add_executable(MEGAsync WIN32)\n'
 DEFINITION = '_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING'
-INSERT = '''    # Community Windows build compatibility: Qt 5 may use deprecated
-    # stdext::checked_array_iterator in some headers. Newer MSVC emits
-    # STL4043/C4996, fatal under the existing /WX warning policy.
-    # Scope only this deprecation acknowledgment to the MEGAsync target;
-    # do not turn off /WX or suppress all C4996 diagnostics.
-    if (MSVC)
-        target_compile_definitions(MEGAsync PRIVATE
-            _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
-    endif()
-'''
+# Verify one actual WIN32 target creation, not the count of compilation options.
+# Matching a real CMake command anchored to a line prevents comments from
+# masquerading as build targets and supports ordinary CMake whitespace changes.
+WIN_TARGET = re.compile(
+    r'(?mi)^(?P<block>[ \t]*if[ \t]*\([ \t]*WIN32[ \t]*\)[ \t]*\n'
+    r'[ \t]*add_executable[ \t]*\([ \t]*MEGAsync[ \t]+WIN32[ \t]*\)[ \t]*(?:\#[^\n]*)?\n)'
+)
+INSERT = '    # Community compatibility: applied only after real Qt/MSVC STL4043 probes.\n    # Target-private; preserve upstream /WX and all other warning diagnostics.\n    if (MSVC)\n        target_compile_definitions(MEGAsync PRIVATE\n            _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)\n    endif()\n'
 
 
 def patch(root: Path) -> Path:
@@ -28,13 +28,18 @@ def patch(root: Path) -> Path:
     source = path.read_text(encoding='utf-8-sig')
     if DEFINITION in source:
         raise RuntimeError('Compatibility definition already exists; inspect upstream before changing it')
-    if source.count(ANCHOR) != 1:
-        raise RuntimeError(f'Upstream CMake target declaration changed; expected one known anchor, found {source.count(ANCHOR)}')
-    if source.count('target_compile_definitions(MEGAsync') != 1:
-        raise RuntimeError('Upstream MEGAsync compile-definition structure changed; review required')
-    patched = source.replace(ANCHOR, ANCHOR + INSERT, 1)
-    path.write_text(patched, encoding='utf-8', newline='\n')
-    print(f'SOURCE-INSPECTED: applied probe-verified MEGAsync-only MSVC/Qt STL4043 adapter: {path}')
+    matches = list(WIN_TARGET.finditer(source))
+    if len(matches) != 1:
+        raise RuntimeError(f'Upstream CMake Windows target declaration changed; expected exactly one WIN32 MEGAsync executable, found {len(matches)}')
+    anchor = matches[0]
+    # Insertion is immediately after add_executable(MEGAsync WIN32) INSIDE the
+    # upstream Windows branch. Other definitions, including optional Breakpad,
+    # remain unchanged regardless of their number/order.
+    modified = source[:anchor.end()] + INSERT + source[anchor.end():]
+    if modified.count(DEFINITION) != 1:
+        raise RuntimeError('Internal error: compatibility adapter was not inserted exactly once')
+    path.write_text(modified, encoding='utf-8', newline='\n')
+    print(f'SOURCE-INSPECTED: probe-confirmed MSVC STL4043 macro applied to MEGAsync only: {path}')
     return path
 
 

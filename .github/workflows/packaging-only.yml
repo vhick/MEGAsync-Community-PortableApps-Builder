@@ -11,9 +11,9 @@ on:
         required: true
         type: string
       installer_package_revision:
-        description: 'New installer-only revision, e.g. b1r6'
+        description: 'New installer-only revision, e.g. b1r7'
         required: true
-        default: b1r6
+        default: b1r7
         type: string
       publish_release:
         description: 'Opt in to non-commercial GitHub Release publication'

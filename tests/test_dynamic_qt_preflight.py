@@ -78,6 +78,19 @@ class QtMsvcDetectorTests(unittest.TestCase):
         self.assertEqual(self.target.read_text().count('_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING'), 1)
         self.assertNotIn('/WX-', self.target.read_text())
 
+    def test_actual_two_compile_definitions_probed_and_patched(self):
+        self.target.write_text(CMAKE_SOURCE + '''
+if(USE_BREAKPAD)
+    target_compile_definitions(MEGAsync PRIVATE CRASH_BACKEND_URL="${CRASH_BACKEND_URL}")
+endif()
+''', encoding='utf-8')
+        fake, cmds = self.fake_executor((1, STL4043))
+        result = detector.detect(self.qt, self.source, self.work, self.report, self.project, fake)
+        self.assertEqual(result['mode'], 'target-only-stl4043')
+        self.assertEqual(result['targeted'], 'passed')
+        self.assertEqual(self.target.read_text().count('target_compile_definitions(MEGAsync'), 3)
+        self.assertEqual(len(cmds), 4)
+
     def test_unsupported_removed_stl_api_fails_without_patch(self):
         fake, commands = self.fake_executor((1, MISSING_API))
         before = self.target.read_bytes()
