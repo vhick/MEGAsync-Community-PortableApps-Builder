@@ -1,0 +1,7 @@
+# Licence, redistribution and branding
+
+MEGAsync is NOT generally licensed as an unrestricted open-source package. Its official `LICENCE.md` is named **MEGA LIMITED CODE LICENCE** and grants review, compilation, specified portability/compatibility modifications and **non-commercial** distribution under conditions. Section 3 withholds MEGA name/logo/trademark rights. Full source: https://github.com/meganz/MEGAsync/blob/v6.7.1.0_Win/LICENCE.md . Read the actual text before distributing anything.
+
+This builder includes no copies of MEGA source code, icons or compiled MEGA products. On demand, a GitHub runner fetches official code and includes upstream licence + third-party `CREDITS.md` within the built application. The independent root launcher uses an original neutral cloud icon rather than MEGA artwork; the actual app still contains upstream brand elements and may require further review. Never describe community packages as official, endorsed, or signed by MEGA or PortableApps.com. The default GitHub workflow does **not** publish packages.
+
+**Public releases require explicit, substantiated non-commercial rights and attention to third-party licences, consent to terms, and trademark limits.** Using a private builder repo is recommended until you decide whether and how distribution is permissible. If in doubt, do not publish and request permission from MEGA. Commercial use/distribution requires authorization not granted by the cited licence.

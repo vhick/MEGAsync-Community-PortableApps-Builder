@@ -1,0 +1,10 @@
+/build/
+/out/
+/upstream/
+/vcpkg/
+/Qt/
+__pycache__/
+*.pyc
+*.log
+*.paf.exe
+*.zip

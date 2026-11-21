@@ -1,0 +1,126 @@
+name: MEGA Community PortableApps - trusted ZIP to installer only
+on:
+  workflow_dispatch:
+    inputs:
+      source_release_tag:
+        description: 'Existing release tag in THIS builder repository containing a validated MEGAsyncPortable ZIP'
+        required: true
+        type: string
+      original_zip_sha256:
+        description: 'Exact SHA256 digest from the original successful source build'
+        required: true
+        type: string
+      installer_package_revision:
+        description: 'New installer-only revision, e.g. b1r2'
+        required: true
+        default: b1r2
+        type: string
+      publish_release:
+        description: 'Opt in to non-commercial GitHub Release publication'
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: write
+concurrency:
+  group: mega-packaging-only-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact same-repository release ZIP
+        shell: pwsh
+        env:
+          OLD_TAG: ${{ inputs.source_release_tag }}
+          NEW_REVISION: ${{ inputs.installer_package_revision }}
+          EXPECTED_SHA256: ${{ inputs.original_zip_sha256 }}
+        run: |
+          if ($env:OLD_TAG -notmatch '^mega-portable-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-b1r[0-9]+-[a-f0-9]{40}$') { throw 'Release tag not from this builder family' }
+          if ($env:NEW_REVISION -notmatch '^b1r[0-9]+$') { throw 'Invalid installer-only package revision' }
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          gh release download "$env:OLD_TAG" -R "$env:GITHUB_REPOSITORY" -p 'MEGAsyncPortable_*_b1r1_x64.zip' -D out
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download original ZIP from THIS repository' }
+          $z=@(Get-ChildItem out -Filter 'MEGAsyncPortable_*_b1r1_x64.zip' -File)
+          if ($z.Count -ne 1) { throw "Expected one original package ZIP, got $($z.Count)" }
+          python scripts/packaging_only.py --zip "$($z[0].FullName)" --sha256 "$env:EXPECTED_SHA256" --out out --env "$env:GITHUB_ENV"
+          if ($LASTEXITCODE -ne 0) { throw 'ZIP provenance and layout verification failed' }
+          "NEW_PACKAGE_REVISION=$env:NEW_REVISION" >> $env:GITHUB_ENV
+
+      - name: Shared Package Builder, independently checked input
+        id: installer
+        continue-on-error: true
+        uses: vhick/Portable-Package-Builder@v1.0.0
+        with:
+          source-dir: out/MEGAsyncPortable
+          output-dir: out/installers
+          engine: custom-nsis
+          package-revision: ${{ env.NEW_PACKAGE_REVISION }}
+          running-exe: App/MEGAsync/MEGAsync.exe
+          timeout-seconds: '900'
+      - name: Verify installer file and hash
+        if: steps.installer.outcome == 'success'
+        id: validate_installer
+        shell: pwsh
+        env:
+          INSTALLER_FILE: ${{ steps.installer.outputs.installer-file }}
+          INSTALLER_SHA: ${{ steps.installer.outputs.installer-sha256 }}
+        run: |
+          if (-not (Test-Path -LiteralPath $env:INSTALLER_FILE)) { throw 'Installer file absent' }
+          $b=[IO.File]::ReadAllBytes($env:INSTALLER_FILE)
+          if ($b.Length -lt 100000 -or $b[0] -ne 77 -or $b[1] -ne 90) { throw 'Installer PE verification failed' }
+          if ((Get-FileHash -LiteralPath $env:INSTALLER_FILE -Algorithm SHA256).Hash -ne $env:INSTALLER_SHA.ToUpperInvariant()) { throw 'Installer hash mismatch' }
+      - name: Preserve original validated ZIP on installer failure
+        if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trusted-original-zip-installer-failed
+          path: |
+            out/*.zip
+            out/ZIP-SHA256.txt
+      - name: Block publication when installer failed
+        if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
+        shell: pwsh
+        run: throw 'Installer build or verification failed; original ZIP preserved'
+      - name: Required Release Publisher dry-run
+        uses: vhick/portable-release-publisher@v1.1.1
+        with:
+          files: |
+            out/*.zip
+            out/installers/*.exe
+          tag: mega-portable-v${{ env.APP_VERSION }}-${{ env.NEW_PACKAGE_REVISION }}-${{ env.UPSTREAM_SHA }}
+          tag-prefix: mega-portable-
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} installer ${{ env.NEW_PACKAGE_REVISION }}
+          keep-releases: '3'
+          prune: 'false'
+          dry-run: 'true'
+      - name: Publish trusted original ZIP plus new installer when explicitly approved
+        if: inputs.publish_release == true
+        uses: vhick/portable-release-publisher@v1.1.1
+        with:
+          files: |
+            out/*.zip
+            out/installers/*.exe
+          tag: mega-portable-v${{ env.APP_VERSION }}-${{ env.NEW_PACKAGE_REVISION }}-${{ env.UPSTREAM_SHA }}
+          tag-prefix: mega-portable-
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} installer ${{ env.NEW_PACKAGE_REVISION }}
+          keep-releases: '3'
+          prune: 'false'
+          dry-run: 'false'
+      - name: Make unpublished outputs available
+        if: inputs.publish_release != true
+        uses: actions/upload-artifact@v4
+        with:
+          name: MEGA-verified-repackage-${{ env.NEW_PACKAGE_REVISION }}
+          path: |
+            out/*.zip
+            out/installers/*.exe
+            out/ZIP-SHA256.txt

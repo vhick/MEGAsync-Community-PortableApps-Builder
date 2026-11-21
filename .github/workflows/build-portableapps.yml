@@ -1,0 +1,231 @@
+name: MEGA Desktop Community PortableApps - source build
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_version:
+        description: "Stable Windows tag (e.g. v6.7.1.0_Win); blank = newest published stable Windows release"
+        required: false
+        type: string
+        default: ''
+      publish_release:
+        description: "Publish validated ZIP and custom-NSIS installer (non-commercial distribution only)"
+        required: true
+        type: boolean
+        default: false
+      vcpkg_commit:
+        description: "Optional exact 40-char vcpkg commit for reproducible dependencies; blank = resolve and record remote HEAD"
+        required: false
+        type: string
+        default: ''
+permissions:
+  contents: write
+concurrency:
+  group: mega-portableapps-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 350
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      GIT_TERMINAL_PROMPT: '0'
+      QT_ROOT: ${{ github.workspace }}\Qt
+      SOURCE_ROOT: ${{ github.workspace }}\upstream
+      BUILD_ROOT: ${{ github.workspace }}\build
+      KIT_ROOT: ${{ github.workspace }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout independent builder repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test resolver and fail-closed source patch fixture
+        shell: pwsh
+        run: |
+          python -m unittest discover -v -s tests
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture tests failed' }
+          python scripts/smoke_tests.py
+          if ($LASTEXITCODE -ne 0) { throw 'Static checks failed' }
+
+      - name: Resolve official stable Windows release
+        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.upstream_version }}
+        run: |
+          python scripts/resolve.py --tag "$env:REQUESTED_TAG" --env "$env:GITHUB_ENV"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve official stable Windows release' }
+
+      - name: Acquire exact upstream tag and its pinned SDK submodule
+        shell: pwsh
+        run: |
+          git clone --no-checkout --filter=blob:none https://github.com/meganz/MEGAsync.git "$env:SOURCE_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw 'Upstream clone failed' }
+          git -C "$env:SOURCE_ROOT" fetch --depth 1 origin "refs/tags/${env:UPSTREAM_TAG}:refs/tags/${env:UPSTREAM_TAG}"
+          if ($LASTEXITCODE -ne 0) { throw 'Requested official tag fetch failed' }
+          git -C "$env:SOURCE_ROOT" checkout --detach "refs/tags/$env:UPSTREAM_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Tag checkout failed' }
+          $actual = (git -C "$env:SOURCE_ROOT" rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actual -notmatch '^[0-9a-f]{40}$') { throw 'Unverified upstream commit' }
+          git -C "$env:SOURCE_ROOT" submodule update --init --depth 1 src/MEGASync/mega
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned MEGA SDK submodule checkout failed' }
+          $sdk = (git -C "$env:SOURCE_ROOT/src/MEGASync/mega" rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $sdk -notmatch '^[0-9a-f]{40}$') { throw 'Invalid SDK submodule commit' }
+          "UPSTREAM_SHA=$actual" >> $env:GITHUB_ENV
+          "SDK_SHA=$sdk" >> $env:GITHUB_ENV
+          Write-Host "SOURCE-INSPECTED upstream tag=$env:UPSTREAM_TAG commit=$actual sdk=$sdk"
+
+      - name: Patch MEGA configuration directory at source (fail closed)
+        shell: pwsh
+        run: |
+          python scripts/patch_source.py "$env:SOURCE_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw 'Source patch failed' }
+
+      - name: Install verified-route Qt 5.15.2 and build helpers
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed' }
+          python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -O "$env:QT_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt package retrieval failed' }
+          $qt = Join-Path $env:QT_ROOT '5.15.2/msvc2019_64'
+          if (-not (Test-Path (Join-Path $qt 'bin/windeployqt.exe'))) { throw 'Qt SDK layout was not verified' }
+          "MEGA_QT=$qt" >> $env:GITHUB_ENV
+
+      - name: Resolve and record vcpkg dependency manager identity
+        shell: pwsh
+        env:
+          REQUESTED_VCPKG_COMMIT: ${{ inputs.vcpkg_commit }}
+        run: |
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:KIT_ROOT/vcpkg"
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg clone failed' }
+          $requested=$env:REQUESTED_VCPKG_COMMIT.Trim()
+          if ($requested) {
+            if ($requested -notmatch '^[0-9a-fA-F]{40}$') { throw 'vcpkg override must be 40-char immutable SHA' }
+            git -C "$env:KIT_ROOT/vcpkg" fetch --depth=1 origin $requested
+            if ($LASTEXITCODE -ne 0) { throw 'Exact vcpkg SHA fetch failed' }
+            git -C "$env:KIT_ROOT/vcpkg" checkout --detach $requested
+            if ($LASTEXITCODE -ne 0) { throw 'Exact vcpkg SHA checkout failed' }
+          }
+          $sha=(git -C "$env:KIT_ROOT/vcpkg" rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') { throw 'Invalid vcpkg source SHA' }
+          "VCPKG_SHA=$sha" >> $env:GITHUB_ENV
+          & "$env:KIT_ROOT/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }
+
+      - name: Build actual MEGA Desktop application from pinned source
+        shell: pwsh
+        run: |
+          cmake -G 'Visual Studio 17 2022' -A x64 `
+            -DVCPKG_ROOT="$env:KIT_ROOT/vcpkg" `
+            -DCMAKE_PREFIX_PATH="$env:MEGA_QT" `
+            -DENABLE_DESIGN_TOKENS_IMPORTER=OFF `
+            -DENABLE_DESKTOP_APP_TESTS=OFF `
+            -DUSE_BREAKPAD=OFF `
+            -S "$env:SOURCE_ROOT" -B "$env:BUILD_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw 'MEGA Desktop CMake configure failed' }
+          cmake --build "$env:BUILD_ROOT" --config Release --target MEGAsync --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'MEGA Desktop source build failed' }
+          & ./scripts/check_build.ps1 -Source "$env:SOURCE_ROOT" -Build "$env:BUILD_ROOT" -Tag "$env:UPSTREAM_TAG"
+
+      - name: Build genuine C++ Windows PE portable launcher
+        shell: pwsh
+        run: |
+          cmake -G 'Visual Studio 17 2022' -A x64 -S launcher -B launcher-build
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher configure failed' }
+          cmake --build launcher-build --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed' }
+          if (-not (Test-Path 'launcher-build/Release/MEGAsyncPortable.exe')) { throw 'No genuine launcher binary produced' }
+
+      - name: Stage and independently validate ZIP before installer
+        shell: pwsh
+        run: |
+          python scripts/stage.py --source "$env:SOURCE_ROOT" --build "$env:BUILD_ROOT" `
+            --launcher "$env:KIT_ROOT/launcher-build/Release/MEGAsyncPortable.exe" `
+            --qt "$env:MEGA_QT" --tag "$env:UPSTREAM_TAG" --version "$env:APP_VERSION" `
+            --sha "$env:UPSTREAM_SHA" --sdk-sha "$env:SDK_SHA" `
+            --vcpkg-sha "$env:VCPKG_SHA" --out "$env:KIT_ROOT/out"
+          if ($LASTEXITCODE -ne 0) { throw 'ZIP staging or verification failed; installer is blocked' }
+          Get-Content 'out/build-outputs.env' | ForEach-Object { $_ >> $env:GITHUB_ENV }
+
+      - name: Independently build PortableApps-style custom-NSIS installer
+        id: installer
+        continue-on-error: true
+        uses: vhick/Portable-Package-Builder@v1.0.0
+        with:
+          source-dir: out/MEGAsyncPortable
+          output-dir: out/installers
+          engine: custom-nsis
+          running-exe: App/MEGAsync/MEGAsync.exe
+          timeout-seconds: '900'
+          package-revision: b1r1
+
+      - name: Validate shared installer independently
+        if: steps.installer.outcome == 'success'
+        id: validate_installer
+        shell: pwsh
+        env:
+          INSTALLER_FILE: ${{ steps.installer.outputs.installer-file }}
+          INSTALLER_SHA: ${{ steps.installer.outputs.installer-sha256 }}
+        run: |
+          if (-not (Test-Path -LiteralPath $env:INSTALLER_FILE -PathType Leaf)) { throw 'Installer action did not create real file' }
+          $hash=(Get-FileHash -LiteralPath $env:INSTALLER_FILE -Algorithm SHA256).Hash
+          if ($hash -ne $env:INSTALLER_SHA.ToUpperInvariant()) { throw 'Installer SHA mismatch' }
+          $bytes=[IO.File]::ReadAllBytes($env:INSTALLER_FILE)
+          if ($bytes.Length -lt 100000 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw 'Installer is not a credible PE payload' }
+          Write-Host "STATIC-VALIDATED shared custom-NSIS installer: $env:INSTALLER_FILE sha256=$hash"
+          "INSTALLER_FILE=$env:INSTALLER_FILE" >> $env:GITHUB_ENV
+
+      - name: Preserve validated ZIP as diagnostic artifact if installer fails
+        if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: independently-validated-zip-installer-failed
+          path: |
+            out/*.zip
+            out/ZIP-SHA256.txt
+          if-no-files-found: error
+
+      - name: Fail closed when installer generation or verification failed
+        if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
+        shell: pwsh
+        run: throw 'Installer phase failed. Independent ZIP retained as workflow artifact. Release not published.'
+
+      - name: Release Publisher mandatory dry-run
+        uses: vhick/portable-release-publisher@v1.1.1
+        with:
+          files: |
+            out/*.zip
+            out/installers/*.exe
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r1-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r1
+          tag-prefix: mega-portable-
+          keep-releases: '3'
+          prune: 'false'
+          dry-run: 'true'
+
+      - name: Publish only after checks and explicit non-commercial authorization
+        if: inputs.publish_release == true
+        uses: vhick/portable-release-publisher@v1.1.1
+        with:
+          files: |
+            out/*.zip
+            out/installers/*.exe
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r1-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r1
+          tag-prefix: mega-portable-
+          keep-releases: '3'
+          prune: 'false'
+          dry-run: 'false'
+
+      - name: Make packages available when release publication was not requested
+        if: inputs.publish_release != true
+        uses: actions/upload-artifact@v4
+        with:
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r1-unpublished
+          path: |
+            out/*.zip
+            out/installers/*.exe
+            out/ZIP-SHA256.txt
+          if-no-files-found: error

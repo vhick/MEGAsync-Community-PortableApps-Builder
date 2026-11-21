@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(MEGAsyncCommunityPortableLauncher LANGUAGES CXX)
+add_executable(MEGAsyncPortable WIN32 main.cpp)
+target_compile_features(MEGAsyncPortable PRIVATE cxx_std_17)
+target_compile_definitions(MEGAsyncPortable PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(MEGAsyncPortable PRIVATE Shell32 Advapi32)
+set_target_properties(MEGAsyncPortable PROPERTIES OUTPUT_NAME "MEGAsyncPortable")
