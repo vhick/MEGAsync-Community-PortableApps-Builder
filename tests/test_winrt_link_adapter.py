@@ -137,6 +137,24 @@ class WinRTAdapterTests(unittest.TestCase):
         self.assertIn('try_get_activation_factory',code)
         self.assertIn('check_hresult',code)
 
+    def test_winrt_probe_declares_hresult_from_sdk_before_e_fail_use(self):
+        """Regression: real b1r8 C2065 in probe.cpp(13,32) on Windows."""
+        code=(ROOT/'scripts/winrt_link_probe/probe.cpp').read_text(encoding='utf-8')
+        self.assertIn('#include <winerror.h>', code)
+        self.assertLess(code.index('#include <winerror.h>'),code.index('check_hresult(E_FAIL)'))
+        self.assertNotIn('#define E_FAIL', code)
+        self.assertIn('#include <winrt/Windows.Foundation.h>', code)
+        self.assertIn('#include <winrt/Windows.UI.Shell.h>', code)
+
+    def test_link_probe_covers_both_previous_linker_references(self):
+        code=(ROOT/'scripts/winrt_link_probe/probe.cpp').read_text(encoding='utf-8')
+        cmake=(ROOT/'scripts/winrt_link_probe/CMakeLists.txt').read_text(encoding='utf-8')
+        self.assertIn('try_get_activation_factory',code)
+        self.assertIn('check_hresult(E_FAIL)',code)
+        self.assertIn('catch (winrt::hresult_error const&)',code)
+        self.assertIn('target_link_libraries(MEGAWinRTLinkProbe PRIVATE WindowsApp)',cmake)
+        self.assertNotIn('add_library(MEGAWinRTLinkProbe',cmake)
+
     def test_workflow_orders_preflight_before_full_vcpkg_build(self):
         wf=(ROOT/'.github/workflows/build-portableapps.yml').read_text()
         self.assertLess(wf.index('Detect Qt/MSVC compatibility using real C++ compile probes'),

@@ -1,4 +1,4 @@
-# Evidence and verification matrix — kit b1r8
+# Evidence and verification matrix — kit b1r9
 
 | Stage | Current evidence |
 |---|---|
@@ -13,8 +13,9 @@
 | Workflow YAML parse | STATIC-VALIDATED in authoring container |
 | Real b1r7 Qt/MSVC compatibility probe | WINDOWS-COMPILED-PROBE: baseline failed STL4043, targeted macro probe succeeded |
 | Real b1r7 Windows source compilation | WINDOWS-COMPILED (partial): SDK and MEGAsync object compilation progressed; final MEGAsync.exe link FAILED/BLOCKED with WinRT LNK2019 |
-| b1r8 WinRT link preflight | NOT YET VERIFIED on Windows; static fixtures passed locally |
-| Complete b1r8 Windows application build | NOT YET VERIFIED; b1r7 reached final link and failed |
+| b1r8 WinRT link preflight | FAILED/BLOCKED: real MSVC 19.44 C2065 E_FAIL undeclared in probe.cpp; linker not reached |
+| b1r9 corrected WinRT link preflight | STATIC-VALIDATED only; real Windows compilation/link pending |
+| Complete b1r9 Windows application build | NOT YET VERIFIED; b1r7 reached final link and failed |
 | Genuine launcher Windows compilation | NOT YET VERIFIED |
 | Startup and login, profile isolation | NOT YET VERIFIED |
 | Real sync/backup behavior | NOT YET VERIFIED |
@@ -30,11 +31,11 @@
 | Desktop appbars, multi-monitor status bars | NOT APPLICABLE |
 | User-confirmed functioning package | NOT YET VERIFIED |
 
-**No b1r8 Windows compile, real runtime sync, installer execution, or release publication took place during authoring of this kit.** Earlier Windows builds did reach compilation and linking, but did not produce a working application. A GitHub-hosted `windows-2022` run is the first real compilation test; an interactive Windows session and controlled MEGA test account are still required for portability claims.
+**The user did run b1r8 on GitHub-hosted Windows and the WindowsApp probe failed at C2065. No completed b1r8 or b1r9 application build, real runtime sync, installer execution or release publication is evidenced.** Earlier Windows builds reached application compilation and linking, but did not produce a working application. A new GitHub-hosted `windows-2022` run is required to validate b1r9; an interactive Windows session and controlled MEGA test account are still required for portability claims.
 
 ## Actual authoring checks run
 
-- `python -m unittest discover -v -s tests` (46 deterministic fixture tests after b1r8 change): PASS on Linux authoring container
+- `python -m unittest discover -v -s tests` (48 deterministic static/fixture tests after b1r9 change): PASS on Linux authoring container
 - `python scripts/smoke_tests.py`: PASS (static text assertions, not program execution)
 - `python -m compileall -q scripts tests`: PASS
 - `yaml.safe_load` on the two workflows: PASS
@@ -66,7 +67,7 @@ Screenshot shows main workflow listed as `.github/workflows/build-portableapps.y
 
 ## 21 November 2026 b1r6/b1r7 adaptive compiler preflight
 
-The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check that runs after Qt is retrieved and before costly vcpkg dependencies. Baseline uses `/WX` and exercises `QList<QString>::operator==`, matching the b1r4 failure. A target-only STL4043 workaround is applied solely if baseline fails with known STL4043/C4996 diagnostics and a second targeted compile succeeds. Missing MSVC APIs and other failures stop. A JSON report accompanies the packaged build. **The b1r7 WinRT linker log independently verifies the successful targeted Qt/MSVC preflight and substantial application compilation; b1r8 full linking and runtime portability remain NOT YET VERIFIED.**
+The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check that runs after Qt is retrieved and before costly vcpkg dependencies. Baseline uses `/WX` and exercises `QList<QString>::operator==`, matching the b1r4 failure. A target-only STL4043 workaround is applied solely if baseline fails with known STL4043/C4996 diagnostics and a second targeted compile succeeds. Missing MSVC APIs and other failures stop. A JSON report accompanies the packaged build. **The b1r7 WinRT linker log independently verifies the successful targeted Qt/MSVC preflight and substantial application compilation; b1r9 full linking and runtime portability remain NOT YET VERIFIED.**
 
 ## 21 November 2026 b1r6 Windows diagnostic evidence and b1r7 correction
 
@@ -75,3 +76,9 @@ The b1r5 always-on source macro was replaced by a real Qt/MSVC compile check tha
 ## 21 November 2026 b1r7 Windows linker failure and b1r8 correction
 
 **WINDOWS-COMPILED (partially):** `logs_121549679805.zip` contains a successful Windows Qt/MSVC targeted compatibility probe, successful vcpkg dependencies, MEGA SDK compilation, and a long MEGAsync compile that reached final executable linkage. **FAILED/BLOCKED:** Visual Studio `DesktopManager.obj` produced `LNK2019` for `WINRT_IMPL_RoGetActivationFactory` and `WINRT_IMPL_RoOriginateLanguageException`, followed by `LNK1120` for two unresolved externals. No final MEGAsync executable was produced. Microsoft documents `WindowsApp.lib` as the C++/WinRT umbrella import library. The new b1r8 WindowsApp probe and target-specific source adapter have **STATIC-VALIDATED** fixture coverage only; the *real* Windows link probe, complete application linker, PortableApps ZIP, installer, and end-user behavior are **NOT YET VERIFIED**.
+
+## 21 November 2026 b1r8 WinRT probe failure and b1r9 correction
+
+**WINDOWS-COMPILED (probe FAILED/BLOCKED):** The user-provided `logs_121566860828.zip` and `winrt-link-compatibility-diagnostics.zip` show MSVC 19.44 / SDK 10.0.26100.0 successfully configuring the probe but failing in `probe.cpp` at `C2065: E_FAIL undeclared`. The b1r8 WinRT `WindowsApp` import-library linkage was **not tested**, and no full application build occurred. The accompanying JSON reports `configure: passed`, `build: failed:1`, and `status: FAILED/BLOCKED`.
+
+**STATIC-VALIDATED b1r9 correction:** `scripts/winrt_link_probe/probe.cpp` now explicitly includes `<winerror.h>` before using `E_FAIL` in `winrt::check_hresult`. New regression tests verify that ordering and the presence of the two WinRT reference paths, plus the existing CMake `WindowsApp` library. Real b1r9 Windows compilation/link, launcher behavior, installer, synchronization and profile isolation remain **NOT YET VERIFIED**.

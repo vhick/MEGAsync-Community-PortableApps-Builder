@@ -1,8 +1,8 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r8 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r9 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
-**Important:** This ZIP is the *builder SOURCE KIT*, not an already compiled MEGA Desktop executable. The earlier b1r4 workflow and the b1r6 Qt/MSVC preflight were executed on Windows GitHub Actions runners (see uploaded diagnostics), and the b1r7 source compilation reached final linking (see the uploaded log); b1r8 itself has not been executed on Windows by the kit author. The full upstream Qt/SDK build could fail because of dependency or GitHub hosted-runner limitations. The delivered solution cannot be considered successfully working until the GitHub workflow and interactive Windows acceptance tests pass. `publish_release` defaults to **false** for legal and runtime-safety reasons.
+**Important:** This ZIP is the *builder SOURCE KIT*, not an already compiled MEGA Desktop executable. The earlier b1r4 workflow and the b1r6 Qt/MSVC preflight were executed on Windows GitHub Actions runners (see uploaded diagnostics), and the b1r7 source compilation reached final linking (see the uploaded log); the b1r8 Windows run reached the WindowsApp test and failed during probe compilation due to an undeclared `E_FAIL`. The full upstream Qt/SDK build could fail because of dependency or GitHub hosted-runner limitations. The delivered solution cannot be considered successfully working until the GitHub workflow and interactive Windows acceptance tests pass. `publish_release` defaults to **false** for legal and runtime-safety reasons.
 
 ## What is included
 
@@ -17,8 +17,27 @@
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
 - `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
-- `tests/`: 46 deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
+- `tests/`: 48 deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
+
+## b1r9: fix the WindowsApp compiler probe (21 Nov 2026)
+
+**FAILED/BLOCKED (real user Windows run):** `logs_121566860828.zip` and
+`winrt-link-compatibility-diagnostics.zip` show that the b1r8 probe's CMake
+configuration passed on VS 2022/MSVC 19.44 and Windows SDK 10.0.26100.0,
+but compiling `scripts/winrt_link_probe/probe.cpp` stopped at:
+`error C2065: 'E_FAIL': undeclared identifier` (line 13). No WindowsApp
+linking, application compilation or package construction occurred in that run.
+This is a missing explicit header in the community probe, *not* a WindowsApp
+import-library failure. Microsoft's Windows SDK defines `E_FAIL` in `winerror.h`.
+
+**b1r9 correction:** Explicitly `#include <winerror.h>` before the C++/WinRT
+namespace headers. Preserve the genuine WinRT activation and exception paths
+and the actual `target_link_libraries(... WindowsApp)` link test; do not create
+stub WinRT implementations or skip compilation. Regression tests now assert
+that the SDK header precedes `E_FAIL` and that both paths are still exercised.
+The WindowsApp test, full application build, launcher, installer and real sync
+are **NOT YET VERIFIED for b1r9**.
 
 ## b1r8: WindowsApp C++/WinRT linkage (21 Nov 2026)
 
@@ -103,7 +122,7 @@ b1r4 keeps the same short paths but initializes `QT_ROOT`, `SOURCE_ROOT` and `BU
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Fix WindowsApp WinRT linker dependency - b1r8`, commit, then **Push origin**.
+4. In GitHub Desktop check all files, enter commit summary `Fix missing WinRT probe E_FAIL SDK header - b1r9`, commit, then **Push origin**.
 5. Open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, `ZIP-SHA256.txt`, `compiler-compatibility.json`, and `winrt-link-compatibility.json`. On preflight failure, download `qt-msvc-compatibility-diagnostics` or `winrt-link-compatibility-diagnostics` to inspect the relevant compiler/linker logs. The app package is **not** this builder ZIP.

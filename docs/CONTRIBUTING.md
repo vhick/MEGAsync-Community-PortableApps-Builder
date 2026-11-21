@@ -1,17 +1,19 @@
-# GitHub Desktop commit information
+# GitHub Desktop commit information — b1r9
 
-Suggested repository: `MEGAsync-Community-PortableApps-Builder` (independent of upstream).
+Repository: `MEGAsync-Community-PortableApps-Builder` (independent of MEGA upstream).
 
-Commit summary:
-`Fix WindowsApp WinRT linker dependency - b1r8`
+**Commit summary:**
 
-Description:
-`Fix the b1r6 adaptive Qt/MSVC compatibility preflight source-patch failure.
+`Fix WinRT E_FAIL compiler probe missing SDK header - b1r9`
 
-The real Windows compiler baseline reports STL4043/C4996, and the targeted compatibility probe succeeds. Official MEGAsync v6.7.1.0_Win defines target_compile_definitions(MEGAsync) twice: one general PUBLIC block and one optional Breakpad PRIVATE block.
+**Description:**
 
-Replace the incorrect exactly-one-definition guard with validation of the unique Windows MEGAsync executable declaration. Add a conditional target-private fix only when the real compiler probe requires it. Preserve upstream Breakpad settings, /WX, the source-built portable-data adapter, vcpkg improvements, launcher, installer and release publisher.
+Fix the b1r8 WindowsApp preflight failure where the test program referenced E_FAIL without including its Windows SDK declaration, causing C2065 before linking.
 
-Add a Windows SDK C++/WinRT link probe, source-inspected target-private WindowsApp linkage, fail-closed diagnostics, and regression tests. Preserve b1r7 Qt/MSVC, vcpkg, and portable data safety. Full b1r8 Windows compilation and runtime remain unverified.`
+Explicitly include winerror.h in the C++/WinRT probe, before use of E_FAIL. Preserve both tested runtime import paths and real WindowsApp.lib linkage; do not bypass the probe or suppress errors.
 
-The first build MUST be unpublished and evaluated on a disposable test account. See README and WINDOWS-TESTING.md.
+Add regression tests for the required header, include order and real WinRT probe/link coverage. Preserve the previous dynamic Qt/MSVC compatibility, vcpkg dependency and Windows path fixes, source-built application, portable data adapter, compiled launcher, installer, and release publisher.
+
+Update package revision and documentation to b1r9.
+
+Run with publish_release=false using disposable test data; Windows application build, sync and installer have not yet passed.

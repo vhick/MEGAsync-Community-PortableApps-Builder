@@ -13,7 +13,7 @@ import subprocess
 import sys
 from patch_winrt_link import patch
 
-REV = 'b1r8'
+REV = 'b1r9'
 
 
 def invoke(command: list[str]) -> tuple[int, str]:
