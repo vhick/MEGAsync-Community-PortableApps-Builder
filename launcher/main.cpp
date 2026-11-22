@@ -8,6 +8,10 @@
 #include <vector>
 #include <cwctype>
 
+// Only our child MEGAsync process inherits these Qt cache settings.
+// Do NOT redirect LOCALAPPDATA/APPDATA: that would also affect other Windows APIs.
+
+
 static void Error(const wchar_t* msg) { MessageBoxW(nullptr, msg, L"MEGA Desktop Community Portable", MB_ICONERROR | MB_OK); }
 static std::wstring ExePath() {
     std::vector<wchar_t> buf(512);
@@ -51,6 +55,40 @@ static std::wstring Quote(const std::wstring& s) {
     }
     q.append(backslash*2,L'\\'); return q+L"\"";
 }
+// Qt 5.15 QML_DISK_CACHE_PATH uses QString::fromLocal8Bit(qgetenv(...)).
+// A non-ASCII portable root might not survive the Windows active code page.
+// In that situation, disable just the optional QML disk cache, never fall
+// back to creating host-local files or create a lossy directory name.
+static bool IsAsciiPath(const std::wstring& path) {
+    for (wchar_t c : path) if (c > 0x7f) return false;
+    return true;
+}
+static bool UnsetEnv(const wchar_t* key) {
+    if (SetEnvironmentVariableW(key, nullptr)) return true;
+    return GetLastError() == ERROR_ENVVAR_NOT_FOUND;
+}
+static bool SetPortableQtCaches(const std::wstring& data) {
+    // These are documented Qt process-local switches (not Windows-wide env).
+    // They prevent Qt 5 OpenGL and future Qt 6 RHI shader disk caches from
+    // writing into shared %LOCALAPPDATA%\cache\qtshadercache-*.
+    if (!SetEnvironmentVariableW(L"QT_DISABLE_SHADER_DISK_CACHE", L"1")) return false;
+    if (!SetEnvironmentVariableW(L"QSG_RHI_DISABLE_SHADER_DISK_CACHE", L"1")) return false;
+
+    const std::wstring qmlCache = data + L"\\Cache\\QML";
+    // Qt 5.15 decodes QML_DISK_CACHE_PATH with the local code page; be
+    // conservative for Unicode and extreme paths until real-runtime proven.
+    if (!IsAsciiPath(qmlCache) || qmlCache.size() >= 240) {
+        return UnsetEnv(L"QML_FORCE_DISK_CACHE")
+            && UnsetEnv(L"QML_DISK_CACHE_PATH")
+            && SetEnvironmentVariableW(L"QML_DISABLE_DISK_CACHE", L"1");
+    }
+    const std::wstring cacheRoot = data + L"\\Cache";
+    if (!Mkdir(cacheRoot) || !IsRealDirectory(cacheRoot)
+        || !Mkdir(qmlCache) || !IsRealDirectory(qmlCache)) return false;
+    // QML cache remains enabled and reusable across launches and relocation.
+    // An inherited QML_DISABLE_DISK_CACHE=1 is intentionally respected.
+    return SetEnvironmentVariableW(L"QML_DISK_CACHE_PATH", qmlCache.c_str());
+}
 int WINAPI wWinMain(HINSTANCE,HINSTANCE,LPWSTR,int) {
     std::wstring path=ExePath();
     auto slash=path.find_last_of(L"\\/");
@@ -72,7 +110,11 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,LPWSTR,int) {
     }
     // Upstream's patched loadDataPath() applies MEGA's restrictive, owner-only ACL routine.
     if(!SetEnvironmentVariableW(L"MEGA_PORTABLE_DATA_DIR",profile.c_str())) {Error(L"Cannot set portable profile path.");return 6;}
-    // No global APPDATA/LOCALAPPDATA/TEMP rewriting: other processes remain untouched.
+    if(!SetPortableQtCaches(data)) {
+        Error(L"Cannot configure portable Qt caches safely. Check Data folder permissions.");return 9;
+    }
+    // No APPDATA/LOCALAPPDATA/TEMP rewriting or host cache deletion. Settings
+    // affect only MEGAsync.exe and its descendants, never installed programs.
     int argc=0; LPWSTR* argv=CommandLineToArgvW(GetCommandLineW(),&argc);
     std::wstring cmd=Quote(exe);
     if(argv){for(int i=1;i<argc;i++){cmd+=L" ";cmd+=Quote(argv[i]);} LocalFree(argv);}

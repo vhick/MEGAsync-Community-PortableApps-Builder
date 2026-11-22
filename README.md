@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r14 (working startup user-confirmed; other portability tests pending)
+# MEGA Desktop Community PortableApps Builder Kit — b1r15 (b1r14 working baseline; b1r15 runtime unverified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -17,11 +17,11 @@
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original red community MP icons embedded in launcher and AppInfo (not MEGA artwork), verified RCC runtime resources, Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
 - `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
-- `scripts/refresh_icons_only.py` and `.github/workflows/refresh-icons-only.yml`: restore a verified successful unpublished source-build ZIP, compile only the tiny launcher and replace original community artwork in the menu and launcher; retain identical application binaries, verify checksums, and produce a fresh ZIP plus custom-NSIS installer.
+- `scripts/refresh_icons_only.py` and `.github/workflows/refresh-icons-only.yml`: restore a verified successful unpublished source-build ZIP, compile only the small launcher with the portable Qt cache policy and preserve matching community artwork; retain identical application binaries, verify checksums, and produce a fresh ZIP plus custom-NSIS installer.
 - `tests/`: deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
 
-## b1r14: replace generic cloud with red community MP icon (22 November 2026)
+## b1r14: red community MP icon (historical working baseline)
 
 **USER-CONFIRMED (startup):** The user reports the b1r13 package is working and supplies a screenshot of the PortableApps menu. Its still-blue icon is expected: the old original `scripts/make_icons.py` draws a generic cloud by design. No evidence indicates that the menu failed to load the icon. Real synchronization, installed-MEGA coexistence, and relocation are not independently verified by this screenshot.
 
@@ -29,7 +29,7 @@
 
 **ICON UPDATE:** Generate a distinctive red, rounded-square MP community monogram rather than the old blue cloud. Generate transparent 16/32/75/128/256 PNGs and a six-resolution Windows ICO. The launcher embeds exactly that ICO through `portable_icon.rc`; `stage.py` checks byte identity with the menu ICO. Never substitute MEGA's official trademarked icon; upstream `LICENCE.md` grants no use of its marks. The app's original binary and profile handling are unchanged.
 
-**FAST ICON-ONLY REBUILD (recommended for an already-working b1r13 build):** Push b1r14, open **Actions → MEGA Community PortableApps - update icons only (no application rebuild)**, enter the GitHub Actions **successful b1r13 source-build run ID** and **SHA-256 of the original b1r13 application ZIP** (from `ZIP-SHA256.txt` inside that run's artifact), and leave `publish_release=false`. The dedicated workflow validates GitHub source-run provenance, downloads the exact unpublished source ZIP, verifies SHA-256 and required `.rcc` files, builds only the C++ launcher and its artwork, creates the b1r14 ZIP and shared custom-NSIS installer, and preserves the original `App/MEGAsync/` application files byte-for-byte. If the original source-build run was not successful or its ZIP is missing/expired, use the full source-build workflow. This icon-only workflow is new and **NOT YET VERIFIED on a hosted Windows runner**.
+**FAST LAUNCHER-ONLY REBUILD:** Push b1r15, open **Actions → MEGA Community PortableApps - update launcher and icons (no app rebuild)**, enter the GitHub Actions **successful b1r13 source-build run ID** and **SHA-256 of the original b1r13 application ZIP** (from `ZIP-SHA256.txt` inside that run's artifact), and leave `publish_release=false`. The dedicated workflow validates GitHub source-run provenance, downloads the exact unpublished source ZIP, verifies SHA-256 and required `.rcc` files, builds only the C++ launcher and its artwork, creates the b1r15 ZIP and shared custom-NSIS installer, and preserves the original `App/MEGAsync/` application files byte-for-byte. If the original source-build run was not successful or its ZIP is missing/expired, use the full source-build workflow. The launcher-only cache-adjusted workflow is **NOT YET VERIFIED on a hosted Windows runner**.
 
 **INSTALL/UPGRADE:** Close all MEGAsync background/tray processes before replacing package binaries. Never delete `Data/`. Refresh the PortableApps menu with **Apps → Refresh App Icons** (PortableApps Platform support guidance) and reopen it if Windows icon caching retains the old artwork. The new red design is an original community icon, not the official MEGA icon. GUI/runtime tests remain manual acceptance steps.
 
@@ -263,3 +263,31 @@ The local authoring tests included: Python syntax, resolver test fixtures, patch
 - Shared publisher action: https://github.com/vhick/portable-release-publisher/blob/v1.1.1/action.yml
 
 Read `docs/AUDIT.md`, `docs/WINDOWS-TESTING.md`, and `docs/EVIDENCE.md` before using real cloud data.
+
+
+## b1r15 — portable Qt QML and shader caches (user-observed host traces)
+
+The latest user-confirmed working baseline was b1r14. A real Windows inspection subsequently
+found Qt-generated host paths:
+
+- `%LOCALAPPDATA%\Mega Limited\MEGAsync\cache\qmlcache` — QML compilation cache.
+- `%LOCALAPPDATA%\cache\qtshadercache-x86_64-little_endian-llp64` — Qt OpenGL shared shader cache (sometimes only an empty folder).
+
+The b1r15 C++ launcher sets **per-process** environment settings before `CreateProcessW`:
+
+- `QML_DISK_CACHE_PATH=<PortableRoot>\Data\Cache\QML`: preserves QML cache persistence and avoids the ordinary host cache.
+- `QT_DISABLE_SHADER_DISK_CACHE=1` and `QSG_RHI_DISABLE_SHADER_DISK_CACHE=1`: disables optional shared shader disk caching to avoid unrelated host cache ownership and deletion hazards. This may slightly increase shader compilation time; rendering itself remains enabled.
+- If the portable path has non-ASCII characters or is extremely long, Qt 5.15's QML environment decoder can be lossy. In that case only QML **disk caching** is disabled, rather than write to the host; application and account data remain portable. No system environment changes or global LocalAppData redirection are performed.
+
+The above is source-inspected and statically tested, **not yet user-confirmed on a real Windows runtime**. Even the shader-cache disable flag is not a substitute for before/after ProcMon tests: Qt or drivers might create empty directories on some configurations.
+
+### Recommended fast update (do not rebuild MEGAsync)
+
+1. Commit the full b1r15 builder and push.
+2. Open GitHub Actions → **MEGA Community PortableApps - update launcher and icons (no app rebuild)**.
+3. Supply the **original successful source-build run ID** and original validated application ZIP SHA-256; b1r13 source output is appropriate if it still exists.
+4. The workflow reuses the existing app files and all five RCC resources, builds only the C++ launcher with updated cache controls and the same red M icon, revalidates and creates ZIP and installer. No source rebuild.
+5. Save a backup of the installed `MEGAsyncPortable\Data` before replacing any binaries; close MEGA from the tray. Test on disposable sync folders before normal use.
+6. Use `docs/WINDOWS-TESTING.md` to verify no **new** cache files appear in the two host locations during fresh launches. Do not auto-delete anything from host paths.
+
+**Pre-existing host caches:** Leave them untouched unless individually proven exclusively owned and safe. The Qt shader path is shared with other applications and must never be broadly deleted by this builder.

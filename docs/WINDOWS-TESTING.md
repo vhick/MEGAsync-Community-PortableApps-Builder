@@ -24,3 +24,13 @@ Avoid ProcMon against valuable installed profiles or real cloud data. The native
 - In GitHub Actions, confirm `Verify WindowsApp C++/WinRT linkage and source adapter` completes with `WINDOWS-COMPILED-LINK-PROBE`, then confirm the full application `MEGAsync.exe` link succeeds independently. The miniature probe must never be presented as a full application build.
 - Confirm portable and separately installed MEGA Desktop applications' tray and notification identities are not mixed. Observe taskbar pin requests and toast click activation under a regular (non-elevated) Windows account. Do not automatically approve shell registration or taskbar pinning.
 - Audit and compare Windows registry, Start Menu, Explorer, and host AppData before/after launch; do not delete ambiguous or pre-existing items. Record remaining traces; these tests cannot run in a headless GitHub Actions job.
+
+
+## b1r15 targeted Qt cache acceptance (mandatory interactive Windows test)
+
+- **Before launch:** close all installed and portable MEGA clients. Snapshot file names and hashes (including empty directories) under `%LOCALAPPDATA%\Mega Limited\MEGAsync\cache\qmlcache` and `%LOCALAPPDATA%\cache\qtshadercache-*`. Never delete these paths.
+- Start the rebuilt root `MEGAsyncPortable.exe` from a movable NTFS folder; inspect `Data\Cache\QML` for new .qmlc files after UI use and restart. The child environment should provide `QML_DISK_CACHE_PATH` before Qt initialization.
+- Check no **new** attributed MEGA QML cache files appear at the old host path. Observe the shader cache using ProcMon; with Qt's disk-cache disable flags, no persistent shader files should be generated. Whether an empty directory still appears must be verified on the actual Windows runtime.
+- Test a path containing spaces, and separately a Unicode path: the latter intentionally disables optional QML disk caching rather than falling back to LocalAppData on Qt 5.15.
+- Compare installed-app profile and cache snapshots before and after launch. Do not delete or move shared host cache files. Test a disposable sync job, restart and tray exit, and monitor Qt descendant processes for unexpected cache activity.
+- If either old host location continues receiving new files attributable to portable MEGA, mark containment **FAILED** and supply ProcMon/file logs; do not claim perfect portability.

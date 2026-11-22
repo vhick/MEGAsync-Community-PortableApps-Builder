@@ -1,6 +1,6 @@
-## Icon still shows the old blue cloud after b1r14
+## Icon still shows the old blue cloud (b1r14 and later)
 
-The PortableApps menu reads `App/AppInfo/appicon_16.png`, `appicon_32.png` and `appicon.ico`. The b1r14 source now generates a distinctive red MP icon and embeds its ICO in the root launcher. After replacing the portable application package, choose **PortableApps menu → Apps → Refresh App Icons**; restart the menu if Windows still caches the old icon. Verify you are running the new root `MEGAsyncPortable.exe`, not the old shortcut or a second copy of the folder. Icon-only builds preserve `App/MEGAsync/` binaries and `Data/` by design.
+The PortableApps menu reads `App/AppInfo/appicon_16.png`, `appicon_32.png` and `appicon.ico`. The b1r14 and later source generates a distinctive red MP icon and embeds its ICO in the root launcher. After replacing the portable application package, choose **PortableApps menu → Apps → Refresh App Icons**; restart the menu if Windows still caches the old icon. Verify you are running the new root `MEGAsyncPortable.exe`, not the old shortcut or a second copy of the folder. Icon-only builds preserve `App/MEGAsync/` binaries and `Data/` by design.
 
 The official trademarked MEGA logo cannot be assumed redistributable under the MEGAsync source licence. The original community icon is not a copy of that artwork.
 
@@ -64,3 +64,13 @@ The pinned shared action requires Windows backslashes. Both workflows now pass `
 - **b1r8 WindowsApp preflight stops with C2065 `E_FAIL` undeclared in `scripts/winrt_link_probe/probe.cpp`:** The probe omitted the SDK header that declares `E_FAIL`; this is a compile failure and **does not show that WindowsApp.lib is missing or broken**. b1r9 explicitly includes `<winerror.h>` and adds a header regression test. Re-run the full workflow unpublished; the WindowsApp probe must first compile and link successfully before vcpkg and the actual MEGAsync build continue.
 
 - **b1r7 link fails with `DesktopManager.obj` LNK2019 `WINRT_IMPL_RoGetActivationFactory` / `WINRT_IMPL_RoOriginateLanguageException`:** The application is missing the documented Windows SDK `WindowsApp.lib` import library on its own MEGAsync link line. **b1r8** performs a real Windows SDK C++/WinRT compile-and-link probe before vcpkg and, only after it passes, adds target-private `WindowsApp` linkage on MSVC in the official Windows app CMake branch. If the probe fails, obtain `winrt-link-compatibility-diagnostics` from that run; do not suppress linker errors or disable Windows Runtime functionality. A probe pass does not guarantee the whole MEGAsync application links successfully.
+
+
+## b1r15: Qt LocalAppData QML cache or shader-cache folder still appears
+
+1. Make sure you updated **MEGAsyncPortable.exe itself**, not just the files under `App/MEGAsync`. A reused b1r14 launcher will continue using host Qt cache defaults.
+2. Fully quit from the tray and verify no old `MEGAsync.exe` remains. Launch only the b1r15 root launcher.
+3. For ordinary ASCII paths, look for `Data\Cache\QML` containing QML cache files. The cache is intentionally persisted and should travel with your portable folder.
+4. When a Unicode or very long portable path is used, QML disk caching is intentionally disabled rather than writing host files; it is normal for `Data\Cache\QML` to be absent.
+5. Snapshot the two old host paths before/after the new launch, and if they change collect ProcMon events attributed to `MEGAsync.exe`. Qt shared shader cache directories may be used by other apps; do **not** delete them without attribution. If only an empty Qt shader directory is still created, report the behavior as a remaining Qt framework limitation rather than delete it blindly.
+6. Do not set `APPDATA`, `LOCALAPPDATA`, `TEMP` or `XDG_CACHE_HOME` system-wide as a workaround. Do not disable rendering, remove drivers or touch the installed MEGA profile.

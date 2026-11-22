@@ -1,6 +1,29 @@
-## 22 November 2026 b1r13 runtime startup user confirmation / b1r14 icon update
+## 22 November 2026 — b1r15 Qt host-cache remediation
 
-**USER-CONFIRMED**: The user stated "Working good now" for b1r13 and showed the PortableApps menu entry "MEGA Desktop Community" with a blue cloud icon. Treat this as a successful user-reported startup result. The screenshot does not independently establish synchronization, crash recovery, Windows state containment, safe relocation or installed MEGA coexistence. **SOURCE-INSPECTED**: b1r13 `scripts/make_icons.py` intentionally generates a generic cloud, so the icon issue is by design, not a failed Windows icon-loader or packaging subsystem. **STATIC-VALIDATED**: b1r14 replaces it with original red MP artwork, aligns menu and launcher ICO, and adds an icon-only repackage workflow that must verify a successful source run, original SHA, source-build identity and unchanged app files. **NOT YET VERIFIED**: b1r14 Windows compiler/installer/runtime re-run.
+**USER-OBSERVED:** After user-confirmed b1r14 startup and red icon, the
+portable MEGAsync process was observed creating Qt-owned paths:
+`%LOCALAPPDATA%\Mega Limited\MEGAsync\cache\qmlcache` (many files)
+and `%LOCALAPPDATA%\cache\qtshadercache-x86_64-little_endian-llp64`
+(empty directory). Qt 5.15 QML's real source checks `QML_DISK_CACHE_PATH`;
+Qt OpenGL shader disk cache uses a Windows generic cache location and
+checks `QT_DISABLE_SHADER_DISK_CACHE`.
+
+**STATIC-VALIDATED:** The b1r15 compiled-launcher source sets the per-child
+QML cache directory under portable Data before CreateProcessW, disables
+optional shader disk caching, and refuses unsafe Unicode/long-path QML
+cache redirection by disabling just QML disk caching. It leaves installed
+profiles, host caches and global AppData environment untouched. New launcher
+refresh workflow preserves existing source-built app binaries and red M icon.
+
+**NOT YET VERIFIED:** Actual b1r15 Windows compilation, launch, attribution
+of new/empty shader-cache directories, account/synchronization operation,
+installation, upgrade, rollback and relocation. No proof of zero host writes.
+
+---
+
+## 22 November 2026 b1r13 startup confirmation / b1r14 icon update (historical)
+
+**USER-CONFIRMED**: The user stated "Working good now" for b1r13 and showed the PortableApps menu entry "MEGA Desktop Community" with a blue cloud icon. Treat this as a successful user-reported startup result. The screenshot does not independently establish synchronization, crash recovery, Windows state containment, safe relocation or installed MEGA coexistence. **SOURCE-INSPECTED**: b1r13 `scripts/make_icons.py` intentionally generates a generic cloud, so the icon issue is by design, not a failed Windows icon-loader or packaging subsystem. **STATIC-VALIDATED**: b1r14 replaces it with original red MP artwork, aligns menu and launcher ICO, and adds an icon-only repackage workflow that must verify a successful source run, original SHA, source-build identity and unchanged app files. **USER-CONFIRMED**: b1r14 starts and its red M icon displays properly (Nov 22, 2026). No assertion of full synchronization or complete cache containment follows from that confirmation.
 
 ## 22 November 2026 b1r12 Windows test failure and b1r13 correction
 

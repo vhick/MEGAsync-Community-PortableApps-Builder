@@ -37,9 +37,9 @@ class WindowsBootstrapTests(unittest.TestCase):
     def test_revisions_align(self):
         main=(ROOT/'.github/workflows/build-portableapps.yml').read_text(encoding='utf-8')
         package=(ROOT/'.github/workflows/packaging-only.yml').read_text(encoding='utf-8')
-        self.assertIn('package-revision: b1r14', main)
-        self.assertIn('default: b1r14',package)
-        self.assertIn('tag: mega-portable-v${{ env.APP_VERSION }}-b1r14-',main)
+        self.assertIn('package-revision: b1r15', main)
+        self.assertIn('default: b1r15',package)
+        self.assertIn('tag: mega-portable-v${{ env.APP_VERSION }}-b1r15-',main)
 
 if __name__=='__main__':
     unittest.main()

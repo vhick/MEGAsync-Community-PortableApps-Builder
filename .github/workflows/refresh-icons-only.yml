@@ -1,4 +1,4 @@
-name: MEGA Community PortableApps - update icons only (no application rebuild)
+name: MEGA Community PortableApps - update launcher and icons (no app rebuild)
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +19,7 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: mega-refresh-icons-${{ github.ref }}
+  group: mega-refresh-launcher-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   refresh:
@@ -59,7 +59,7 @@ jobs:
           python scripts/verify_source_run.py --run-json original/source-run.json --workflow-json original/source-workflow.json --repository "$env:GITHUB_REPOSITORY" --run-id "$env:SOURCE_RUN_ID"
           if ($LASTEXITCODE -ne 0) { throw 'Wrong source run, repository or workflow' }
           $run = ($runJson -join "`n") | ConvertFrom-Json
-          if ($run.conclusion -ne 'success') { throw 'The icon-only workflow requires a successful original source-build run' }
+          if ($run.conclusion -ne 'success') { throw 'The launcher-refresh workflow requires a successful original source-build run' }
           $artifactJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID/artifacts?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect original run artifacts' }
           $artifacts = ($artifactJson -join "`n") | ConvertFrom-Json
@@ -76,7 +76,7 @@ jobs:
           if (-not $m.Success -or $m.Groups[2].Value -ne $zips[0].Name -or $m.Groups[1].Value.ToLowerInvariant() -ne $env:EXPECTED_SHA256.ToLowerInvariant()) { throw 'Original ZIP SHA256 manifest identity mismatch' }
           python scripts/packaging_only.py --zip "$($zips[0].FullName)" --sha256 "$env:EXPECTED_SHA256" --out out --env "$env:GITHUB_ENV"
           if ($LASTEXITCODE -ne 0) { throw 'Original app ZIP checksum and resource validation failed' }
-      - name: Build new icon-bearing C++ launcher without MEGAsync recompilation
+      - name: Rebuild C++ launcher with portable Qt caches and icon (no app rebuild)
         shell: pwsh
         run: |
           python scripts/make_icons.py launcher
@@ -87,15 +87,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native launcher CMake configure failed' }
           cmake --build launcher-build --config Release --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'Native launcher compilation failed' }
+          python scripts/verify_launcher_cache_policy.py
+          if ($LASTEXITCODE -ne 0) { throw 'Portable Qt cache launcher policy validation failed' }
           python scripts/verify_launcher_icon.py --launcher launcher-build/Release/MEGAsyncPortable.exe
           if ($LASTEXITCODE -ne 0) { throw 'Native launcher has no embedded icon resource' }
-      - name: Replace icons and repackage, preserving compiled application
+      - name: Replace launcher and icons while preserving original application
         shell: pwsh
         env:
           ORIGINAL_SHA256: ${{ inputs.original_zip_sha256 }}
         run: |
           python scripts/refresh_icons_only.py --stage out/MEGAsyncPortable --launcher launcher-build/Release/MEGAsyncPortable.exe --launcher-ico launcher/appicon.ico --icons icon-assets --out out --original-sha256 "$env:ORIGINAL_SHA256"
-          if ($LASTEXITCODE -ne 0) { throw 'Icon-only ZIP update failed; installer blocked' }
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher-only ZIP update failed; installer blocked' }
           python scripts/validate_installer_input.py --source out/MEGAsyncPortable --running-exe 'App\MEGAsync\MEGAsync.exe'
           if ($LASTEXITCODE -ne 0) { throw 'Shared installer input invalid' }
       - name: Shared custom-NSIS PortableApps-style installer
@@ -106,7 +108,7 @@ jobs:
           source-dir: out/MEGAsyncPortable
           output-dir: out/installers
           engine: custom-nsis
-          package-revision: b1r14
+          package-revision: b1r15
           running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
       - name: Verify generated installer checksum and x64 application
@@ -122,51 +124,51 @@ jobs:
           $file = [IO.File]::ReadAllBytes($env:INSTALLER_FILE)
           if ($file.Length -lt 100000 -or $file[0] -ne 77 -or $file[1] -ne 90) { throw 'Invalid installer PE format' }
           if ((Get-FileHash -LiteralPath $env:INSTALLER_FILE -Algorithm SHA256).Hash -ne $env:INSTALLER_SHA.ToUpperInvariant()) { throw 'Installer hash mismatch' }
-      - name: Retain icon-only validated ZIP if installer fails
+      - name: Retain launcher-only validated ZIP if installer fails
         if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: MEGA-icon-only-b1r14-installer-failed
+          name: MEGA-launcher-only-b1r15-installer-failed
           path: |
-            out/MEGAsyncPortable_*_b1r14_x64.zip
+            out/MEGAsyncPortable_*_b1r15_x64.zip
             out/ZIP-SHA256.txt
           if-no-files-found: error
       - name: Block publication if installer failed
         if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
         shell: pwsh
-        run: throw 'Icon-only ZIP validated, but custom-NSIS installer failed; the ZIP was retained as a workflow artifact.'
+        run: throw 'Launcher-only ZIP validated, but custom-NSIS installer failed; the ZIP was retained as a workflow artifact.'
       - name: Shared Release Publisher mandatory dry run
         uses: vhick/portable-release-publisher@v1.1.1
         with:
           files: |
-            out/MEGAsyncPortable_*_b1r14_x64.zip
+            out/MEGAsyncPortable_*_b1r15_x64.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r14-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable icon refresh ${{ env.APP_VERSION }} b1r14
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r15-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r15
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
           dry-run: 'true'
-      - name: Publish icon-only updated ZIP and installer when explicitly approved
+      - name: Publish launcher-only updated ZIP and installer when explicitly approved
         if: inputs.publish_release == true
         uses: vhick/portable-release-publisher@v1.1.1
         with:
           files: |
-            out/MEGAsyncPortable_*_b1r14_x64.zip
+            out/MEGAsyncPortable_*_b1r15_x64.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r14-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable icon refresh ${{ env.APP_VERSION }} b1r14
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r15-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r15
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
           dry-run: 'false'
-      - name: Upload unpublished icon-only ZIP and installer
+      - name: Upload unpublished launcher-only ZIP and installer
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGA-icon-only-b1r14-unpublished
+          name: MEGA-launcher-only-b1r15-unpublished
           path: |
-            out/MEGAsyncPortable_*_b1r14_x64.zip
+            out/MEGAsyncPortable_*_b1r15_x64.zip
             out/installers/*.exe
             out/ZIP-SHA256.txt
           if-no-files-found: error

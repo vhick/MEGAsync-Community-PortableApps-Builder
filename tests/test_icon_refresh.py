@@ -1,4 +1,4 @@
-"""Source-identity / Data safety tests for the b1r14 icon-only repackaging."""
+"""Source-identity / Data safety tests for the b1r15 launcher-only repackaging."""
 import hashlib
 import importlib
 import json
@@ -73,7 +73,7 @@ class IconRefreshTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in a.iterdir()),sorted(p.name for p in b.iterdir()))
             for p in a.iterdir():self.assertEqual(p.read_bytes(),(b/p.name).read_bytes())
 
-    def test_icon_only_zip_preserves_original_app_and_data(self):
+    def test_launcher_only_zip_preserves_original_app_and_data(self):
         with TemporaryDirectory() as d:
             root=Path(d);stage=build_fixture(root)
             icons=root/'newicons';launcher_icons=root/'launchericons'
@@ -90,13 +90,15 @@ class IconRefreshTests(unittest.TestCase):
                 self.assertIn(base+'Data/Nested/Empty/',z.namelist())
                 self.assertEqual(z.read(base+'Data/Nested/data.txt'),b'user bytes must not change')
                 self.assertEqual(z.read(base+'App/AppInfo/appicon.ico'),icons.joinpath('appicon.ico').read_bytes())
-                self.assertIn(b'b1r14',z.read(base+'App/AppInfo/appinfo.ini'))
+                self.assertIn(b'b1r15',z.read(base+'App/AppInfo/appinfo.ini'))
                 ident=json.loads(z.read(base+'Other/Source/BUILD-IDENTITY.json'))
-                self.assertEqual(ident['kit_revision'],'b1r14')
+                self.assertEqual(ident['kit_revision'],'b1r15')
                 self.assertEqual(ident['source_builder_revision'],'b1r13')
                 self.assertEqual(ident['upstream_commit'],'a'*40)
                 self.assertEqual(ident['original_zip_sha256'],'b'*64)
-                self.assertTrue(ident['icon_only_repackage'])
+                self.assertFalse(ident['icon_only_repackage'])
+                self.assertTrue(ident['launcher_only_repackage'])
+                self.assertIn('QML_DISK_CACHE_PATH',ident['portable_qt_cache_policy'])
             self.assertIn(result.name,(root/'out/ZIP-SHA256.txt').read_text())
 
     def test_refuses_mismatched_launcher_and_menu_assets(self):
@@ -122,12 +124,12 @@ class IconRefreshTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'revision missing'):
                 refresh(stage,launcher,root/'icons/appicon.ico',root/'icons',root/'out','b'*64)
 
-    def test_icon_only_workflow_verifies_success_sha_and_retains_zip_on_installer_failure(self):
+    def test_launcher_only_workflow_verifies_success_sha_and_retains_zip_on_installer_failure(self):
         workflow=(ROOT/'.github/workflows/refresh-icons-only.yml').read_text(encoding='utf-8')
         for expected in ('scripts/verify_source_run.py','original_zip_sha256',"conclusion -ne 'success'",'scripts/packaging_only.py',
                          'scripts/refresh_icons_only.py', 'scripts/verify_launcher_icon.py',
                          'vhick/Portable-Package-Builder@v1.0.0','vhick/portable-release-publisher@v1.1.1',
-                         'MEGA-icon-only-b1r14-installer-failed', "'App\\MEGAsync\\MEGAsync.exe'", "dry-run: 'true'", "dry-run: 'false'"):
+                         'MEGA-launcher-only-b1r15-installer-failed', "'App\\MEGAsync\\MEGAsync.exe'", "dry-run: 'true'", "dry-run: 'false'"):
             self.assertIn(expected,workflow)
         self.assertLess(workflow.index('scripts/packaging_only.py'),workflow.index('scripts/refresh_icons_only.py'))
         self.assertLess(workflow.index('scripts/refresh_icons_only.py'),workflow.index('vhick/Portable-Package-Builder@v1.0.0'))

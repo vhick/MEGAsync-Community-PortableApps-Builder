@@ -1,4 +1,4 @@
-"""Repackage a VERIFIED extracted source-build ZIP with new launcher/menu icons.
+"""Repackage a VERIFIED source-build ZIP with rebuilt cache-safe launcher and icons.
 
 The source app's MEGAsync executable and all files under App/MEGAsync are kept
 byte-identical, and the existing package's Data tree is never touched. The
@@ -75,24 +75,27 @@ def refresh(stage: Path, launcher: Path, launcher_ico: Path, generated_icons: Pa
     ini_path.write_text(revisioned_display_version(old_ini, version), encoding='utf-8', newline='\n')
     identity['source_builder_revision'] = old_revision
     identity['kit_revision'] = REV
-    identity['icon_only_repackage'] = True
+    identity['icon_only_repackage'] = False
+    identity['launcher_only_repackage'] = True
+    identity['portable_qt_cache_policy'] = 'QML_DISK_CACHE_PATH under Data/Cache/QML; shader disk cache disabled in child'
     identity['original_zip_sha256'] = original_sha256.lower()
     identity['original_megasync_sha256'] = before['MEGAsync.exe']
     identity['recompiled_launcher'] = True
     identity['runtime_validation'] = identity.get('runtime_validation', 'NOT YET VERIFIED')
     manifest_path.write_text(json.dumps(identity, indent=2, ensure_ascii=False)+'\n',encoding='utf-8')
-    (others/'ICON-REPACK-IDENTITY.json').write_text(json.dumps({
-        'mode':'icon-only, source application binaries unchanged',
+    (others/'LAUNCHER-REPACK-IDENTITY.json').write_text(json.dumps({
+        'mode':'launcher+icons only, source application binaries unchanged',
         'source_builder_revision':old_revision,
-        'icon_builder_revision':REV,
+        'launcher_builder_revision':REV,
         'original_zip_sha256':original_sha256.lower(),
         'upstream_commit':sha,
         'icon_ico_sha256':sha256(launcher_ico),
+        'portable_qt_cache_policy':'QML disk cache under Data; no shader disk cache',
         'app_file_count':len(before),
         'app_megasync_exe_sha256':before['MEGAsync.exe']},indent=2)+'\n',encoding='utf-8')
     after = {p.relative_to(app).as_posix(): sha256(p) for p in app.rglob('*') if p.is_file()}
     if before != after:
-        raise RuntimeError('Icon-only update unexpectedly changed MEGAsync app files')
+        raise RuntimeError('Launcher-only update unexpectedly changed MEGAsync app files')
     output.mkdir(parents=True, exist_ok=True)
     path = output/f'MEGAsyncPortable_{version}_{REV}_x64.zip'
     if path.exists(): raise RuntimeError('Refusing to overwrite an existing portable ZIP')
@@ -121,6 +124,6 @@ def main() -> None:
     ap.add_argument('--original-sha256',required=True)
     a=ap.parse_args()
     path=refresh(a.stage,a.launcher,a.launcher_ico,a.icons,a.out,a.original_sha256)
-    print('STATIC-VALIDATED ICON-ONLY ZIP:',path,'sha256',sha256(path))
+    print('STATIC-VALIDATED LAUNCHER-ONLY ZIP:',path,'sha256',sha256(path))
 
 if __name__=='__main__': main()
