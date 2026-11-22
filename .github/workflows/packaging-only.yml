@@ -3,17 +3,23 @@ on:
   workflow_dispatch:
     inputs:
       source_release_tag:
-        description: 'Existing release tag in THIS builder repository containing a validated MEGAsyncPortable ZIP'
-        required: true
+        description: 'Existing builder release tag containing validated ZIP; choose this OR source_run_id'
+        required: false
+        default: ''
+        type: string
+      source_run_id:
+        description: 'Alternative: GitHub Actions run number holding the independently-validated-zip-installer-failed artifact (e.g. 44918203381)'
+        required: false
+        default: ''
         type: string
       original_zip_sha256:
         description: 'Exact SHA256 digest from the original successful source build'
         required: true
         type: string
       installer_package_revision:
-        description: 'New installer-only revision, e.g. b1r9'
+        description: 'New installer-only revision, e.g. b1r10'
         required: true
-        default: b1r9
+        default: b1r10
         type: string
       publish_release:
         description: 'Opt in to non-commercial GitHub Release publication'
@@ -22,6 +28,7 @@ on:
         type: boolean
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: mega-packaging-only-${{ github.ref }}
   cancel-in-progress: false
@@ -41,19 +48,60 @@ jobs:
         shell: pwsh
         env:
           OLD_TAG: ${{ inputs.source_release_tag }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           NEW_REVISION: ${{ inputs.installer_package_revision }}
           EXPECTED_SHA256: ${{ inputs.original_zip_sha256 }}
         run: |
-          if ($env:OLD_TAG -notmatch '^mega-portable-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-b1r[0-9]+-[a-f0-9]{40}$') { throw 'Release tag not from this builder family' }
+          # Exactly one trusted source: validated release OR this repository's failed-installer artifact.
+          $hasTag = -not [string]::IsNullOrWhiteSpace($env:OLD_TAG)
+          $hasRun = -not [string]::IsNullOrWhiteSpace($env:SOURCE_RUN_ID)
+          if ($hasTag -eq $hasRun) { throw 'Choose exactly one source: source_release_tag OR source_run_id' }
+          if ($hasTag -and $env:OLD_TAG -notmatch '^mega-portable-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-b1r[0-9]+-[a-f0-9]{40}$') {
+            throw 'Release tag not from this builder family'
+          }
+          if ($hasRun -and $env:SOURCE_RUN_ID -notmatch '^[1-9][0-9]{0,18}$') {
+            throw 'Invalid numeric GitHub Actions run ID'
+          }
           if ($env:NEW_REVISION -notmatch '^b1r[0-9]+$') { throw 'Invalid installer-only package revision' }
           New-Item -ItemType Directory -Force -Path out | Out-Null
-          gh release download "$env:OLD_TAG" -R "$env:GITHUB_REPOSITORY" -p 'MEGAsyncPortable_*_b1r*_x64.zip' -D out
-          if ($LASTEXITCODE -ne 0) { throw 'Failed to download original ZIP from THIS repository' }
+          if ($hasTag) {
+            gh release download "$env:OLD_TAG" -R "$env:GITHUB_REPOSITORY" -p 'MEGAsyncPortable_*_b1r*_x64.zip' -D out
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to download original ZIP from THIS repository' }
+          } else {
+            # Inspect provenance, never accept another repository or arbitrary workflow.
+            $runJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot verify original GitHub Actions run' }
+            $run = ($runJson -join "`n") | ConvertFrom-Json -Depth 20
+            if ($run.repository.full_name -ne $env:GITHUB_REPOSITORY -or
+                $run.path -notmatch '/\.github/workflows/build-portableapps\.yml@' -or
+                $run.event -ne 'workflow_dispatch') {
+              throw 'Source run does not belong to this builder source-build workflow'
+            }
+            gh run download "$env:SOURCE_RUN_ID" -R "$env:GITHUB_REPOSITORY" -n 'independently-validated-zip-installer-failed' -D out
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve original independently validated ZIP artifact' }
+            if (-not (Test-Path 'out/ZIP-SHA256.txt' -PathType Leaf)) {
+              throw 'Source artifact missing ZIP-SHA256.txt identity'
+            }
+            $manifest = @(Get-Content -LiteralPath 'out/ZIP-SHA256.txt' -Encoding utf8)
+            $expectedLine = '^([0-9a-fA-F]{64})\s+MEGAsyncPortable_[0-9.]+_b1r[0-9]+_x64\.zip$'
+            if ($manifest.Count -ne 1) { throw 'Original source artifact SHA256 manifest must contain one line' }
+            $manifestMatch = [regex]::Match($manifest[0], $expectedLine)
+            if (-not $manifestMatch.Success) { throw 'Original source artifact SHA256 manifest invalid' }
+            if ($manifestMatch.Groups[1].Value.ToLowerInvariant() -ne $env:EXPECTED_SHA256.ToLowerInvariant()) {
+              throw 'Supplied independent ZIP SHA256 differs from source artifact manifest'
+            }
+          }
           $z=@(Get-ChildItem out -Filter 'MEGAsyncPortable_*_b1r*_x64.zip' -File)
           if ($z.Count -ne 1) { throw "Expected one original package ZIP, got $($z.Count)" }
           python scripts/packaging_only.py --zip "$($z[0].FullName)" --sha256 "$env:EXPECTED_SHA256" --out out --env "$env:GITHUB_ENV"
           if ($LASTEXITCODE -ne 0) { throw 'ZIP provenance and layout verification failed' }
           "NEW_PACKAGE_REVISION=$env:NEW_REVISION" >> $env:GITHUB_ENV
+
+      - name: Preflight shared installer lock executable inside original ZIP
+        shell: pwsh
+        run: |
+          python scripts/validate_installer_input.py --source out/MEGAsyncPortable --running-exe 'App\MEGAsync\MEGAsync.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Shared installer input validation failed' }
 
       - name: Shared Package Builder, independently checked input
         id: installer
@@ -64,7 +112,7 @@ jobs:
           output-dir: out/installers
           engine: custom-nsis
           package-revision: ${{ env.NEW_PACKAGE_REVISION }}
-          running-exe: App/MEGAsync/MEGAsync.exe
+          running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
       - name: Verify installer file and hash
         if: steps.installer.outcome == 'success'

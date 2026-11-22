@@ -1,46 +1,40 @@
-# Evidence and verification matrix — kit b1r9
+## b1r9 Windows build evidence, 21 November 2026 UTC
 
-| Stage | Current evidence |
+User-supplied `logs_121571335574.zip` confirms MEGAsync application x64 source compilation, the native C++ root launcher compilation, and independent PortableApps ZIP verification. The pinned shared Package Builder rejected forward slashes in its `running-exe` input. The workflow uploaded `independently-validated-zip-installer-failed` as a recoverable artifact from run `44918203381`. Installer generation and running MEGA were NOT verified.
+
+b1r10 uses Windows-style `App\MEGAsync\MEGAsync.exe`, adds source-input preflight, and permits same-run repository artifact recovery without recompiling upstream. These changes have local fixture validation only until next hosted Windows run.
+
+# Evidence and verification matrix — kit b1r10
+
+| Stage | Latest supported status |
 |---|---|
-| Upstream latest observed release: v6.7.1.0_Win | SOURCE-INSPECTED (21 Nov 2026; not compiled) |
-| Upstream C++/Qt CMake and Windows build targets | SOURCE-INSPECTED |
-| MEGA application data-path source adapter | SOURCE-INSPECTED anchor + STATIC-VALIDATED fixture only |
-| Source licence and limited redistribution rights | SOURCE-INSPECTED |
-| Pinned package action v1.0.0 inputs/outputs | SOURCE-INSPECTED action.yml |
-| Pinned publisher action v1.1.1 inputs | SOURCE-INSPECTED action.yml |
-| Stable numeric resolver | STATIC-VALIDATED unit fixtures only |
-| Python scripts syntactically valid | STATIC-VALIDATED in Linux authoring container |
-| Workflow YAML parse | STATIC-VALIDATED in authoring container |
-| Real b1r7 Qt/MSVC compatibility probe | WINDOWS-COMPILED-PROBE: baseline failed STL4043, targeted macro probe succeeded |
-| Real b1r7 Windows source compilation | WINDOWS-COMPILED (partial): SDK and MEGAsync object compilation progressed; final MEGAsync.exe link FAILED/BLOCKED with WinRT LNK2019 |
-| b1r8 WinRT link preflight | FAILED/BLOCKED: real MSVC 19.44 C2065 E_FAIL undeclared in probe.cpp; linker not reached |
-| b1r9 corrected WinRT link preflight | STATIC-VALIDATED only; real Windows compilation/link pending |
-| Complete b1r9 Windows application build | NOT YET VERIFIED; b1r7 reached final link and failed |
-| Genuine launcher Windows compilation | NOT YET VERIFIED |
-| Startup and login, profile isolation | NOT YET VERIFIED |
-| Real sync/backup behavior | NOT YET VERIFIED |
-| Complete Qt/vcpkg runtime deployment | NOT YET VERIFIED |
-| Empty-directory handling | STATIC-VALIDATED ZIP construction logic; runtime NOT YET VERIFIED |
-| TraceGuard/ShellGuard cleanup | NOT IMPLEMENTED (no safe allowlist proven) |
-| Win notifications + click activation | NOT YET VERIFIED |
-| Autostart | NOT IMPLEMENTED (not requested) |
-| PortableApps ZIP generation | NOT YET VERIFIED on Windows |
-| Actual custom-NSIS installer generation | NOT YET VERIFIED |
-| Real install, reinstall, upgrade, rollback | NOT YET VERIFIED |
-| Publisher dry-run and publication | NOT YET VERIFIED |
-| Desktop appbars, multi-monitor status bars | NOT APPLICABLE |
-| User-confirmed functioning package | NOT YET VERIFIED |
+| Upstream tag `v6.7.1.0_Win` and SHA `650c9a2df326d7bf28d64e9f6e1588998757a862` | SOURCE-INSPECTED and WINDOWS-COMPILED (b1r9 GitHub run) |
+| MEGA SDK compilation | WINDOWS-COMPILED (b1r9 run) |
+| Adaptive Qt/MSVC probe and target-only fix | WINDOWS-COMPILED-PROBE and Windows build success (b1r9) |
+| C++/WinRT WindowsApp link preflight and main app link | WINDOWS-COMPILED (b1r9 run) |
+| MEGAsync.exe x64 source compilation | WINDOWS-COMPILED (b1r9 run) |
+| MEGAsyncPortable.exe genuine C++ launcher | WINDOWS-COMPILED (b1r9 run) |
+| PortableApps ZIP staging, integrity and x64 PE structure | STATIC-VALIDATED on Windows in b1r9 run |
+| ZIP copy inside failed-installer artifact | Uploaded in b1r9 run (actual ZIP bytes not independently inspected here) |
+| Shared custom-NSIS installer with b1r9 input | FAILED/BLOCKED — forward slash path rejected before NSIS |
+| Shared custom-NSIS installer with corrected b1r10 input | NOT YET VERIFIED on hosted Windows |
+| New same-run artifact recovery route | STATIC-VALIDATED by simulated fixtures; GitHub API and download not yet executed |
+| Real installer install/reinstall/upgrade/rollback | NOT YET VERIFIED |
+| Launch, login, data containment, real cloud sync, notifications | NOT YET VERIFIED |
+| Empty-folder persistence, symlink handling, post-exit host scans | NOT YET VERIFIED at runtime |
+| TraceGuard/ShellGuard | NOT IMPLEMENTED; residual host state needs runtime evidence |
+| Release Publisher dry run and publication | NOT YET VERIFIED |
+| User-confirmed functioning portable package | NOT YET VERIFIED |
 
-**The user did run b1r8 on GitHub-hosted Windows and the WindowsApp probe failed at C2065. No completed b1r8 or b1r9 application build, real runtime sync, installer execution or release publication is evidenced.** Earlier Windows builds reached application compilation and linking, but did not produce a working application. A new GitHub-hosted `windows-2022` run is required to validate b1r9; an interactive Windows session and controlled MEGA test account are still required for portability claims.
+## Local b1r10 authoring checks
 
-## Actual authoring checks run
+- `python -m unittest discover -s tests -q` — 57 PASS (local static/fixture tests)
+- `python scripts/smoke_tests.py` — PASS (static launcher-source assertions only)
+- `python -m compileall -q scripts tests` — PASS
+- Both workflow YAML files parse with PyYAML — PASS (not equivalent to GitHub server-side validation)
+- The builder ZIP integrity and manifest checks are conducted before handoff.
 
-- `python -m unittest discover -v -s tests` (48 deterministic static/fixture tests after b1r9 change): PASS on Linux authoring container
-- `python scripts/smoke_tests.py`: PASS (static text assertions, not program execution)
-- `python -m compileall -q scripts tests`: PASS
-- `yaml.safe_load` on the two workflows: PASS
-
-SHA-256 of the *builder* ZIP is separately reported with the generated download. Production artifacts and their hashes are not known until the GitHub workflow executes.
+The historical entries below preserve what was known **at the time of each older revision**. Where they state that compilation was unverified, the b1r9 result above supersedes those older statuses. No interactive Windows application test is demonstrated by the supplied log.
 
 ## 21 November 2026 b1r1 user-run evidence / b1r2 change
 

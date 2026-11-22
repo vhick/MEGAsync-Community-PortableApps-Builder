@@ -1,3 +1,7 @@
+## b1r9 installer reports "running-exe must be a relative Windows .exe file"
+
+The pinned shared action requires Windows backslashes. Both workflows now pass `App\MEGAsync\MEGAsync.exe` and test its existence and x64 PE structure first. The original b1r9 application ZIP was independently validated and uploaded as a workflow artifact, so use packaging-only with a `source_run_id` and an independently copied SHA-256 to rebuild ONLY the installer. This preserves the original source build and saves hosted Windows compilation time.
+
 # Troubleshooting
 
 - **Workflow absent:** Push the `.github/workflows` folder to default branch, enable Actions on GitHub, ensure ZIP not extracted into a nested folder.

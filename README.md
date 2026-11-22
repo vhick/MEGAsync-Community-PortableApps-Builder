@@ -1,13 +1,13 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r9 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r10 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
-**Important:** This ZIP is the *builder SOURCE KIT*, not an already compiled MEGA Desktop executable. The earlier b1r4 workflow and the b1r6 Qt/MSVC preflight were executed on Windows GitHub Actions runners (see uploaded diagnostics), and the b1r7 source compilation reached final linking (see the uploaded log); the b1r8 Windows run reached the WindowsApp test and failed during probe compilation due to an undeclared `E_FAIL`. The full upstream Qt/SDK build could fail because of dependency or GitHub hosted-runner limitations. The delivered solution cannot be considered successfully working until the GitHub workflow and interactive Windows acceptance tests pass. `publish_release` defaults to **false** for legal and runtime-safety reasons.
+**Important:** This ZIP is the *builder SOURCE KIT*, not an already compiled MEGA Desktop executable. The b1r9 Windows run successfully built the MEGAsync application and community launcher and validated the PortableApps ZIP, but the installer was rejected for an incorrectly formatted `running-exe` input. An extracted ZIP build is not proof of portable runtime behavior. The delivered solution cannot be considered successfully working until the GitHub workflow and interactive Windows acceptance tests pass. `publish_release` defaults to **false** for legal and runtime-safety reasons.
 
 ## What is included
 
 - `.github/workflows/build-portableapps.yml`: independent official-tag discovery, pinned upstream source + SDK checkout, exact source data path patch, vcpkg/Qt setup, actual app source build, genuine MSVC C++ root launcher, completed PortableApps folder and validated ZIP, shared installer, dry-run, optional publication.
-- `.github/workflows/packaging-only.yml`: reuses a **known, original validated ZIP** from a release in this builder repo with mandatory SHA-256 verification and no upstream recompilation.
+- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation.
 - `launcher/main.cpp` and `launcher/CMakeLists.txt`: real compiled Win64 launcher with pre-launch portable profile, job child tracking and simultaneous installed MEGA process guard. No host registry cleanup and no fake EXE.
 - `scripts/detect_msvc_qt_compat.py` and `scripts/qt_msvc_probe/`: real MSVC `/WX` compiler probes using the downloaded Qt SDK and Qt's `QList<QString>::operator==`. Leave the target unchanged when compatible; apply a verified fix only after diagnosing the exact known STL4043 failure.
 - `scripts/patch_msvc_qt_compat.py`: target-only, fail-closed compatibility adapter called **conditionally by the Qt probe**, never unconditionally by the workflow.
@@ -17,8 +17,39 @@
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
 - `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
-- `tests/`: 48 deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
+- `tests/`: 57 deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
+
+## b1r10: Windows build success, shared-installer path correction and fast recovery (22 Nov 2026)
+
+**WINDOWS-COMPILED / STATIC-VALIDATED evidence (real b1r9 run):** The user-provided
+`logs_121571335574.zip` documents successful upstream `v6.7.1.0_Win`
+source compilation (commit `650c9a2df326d7bf28d64e9f6e1588998757a862`),
+conditional Qt/MSVC compatibility, WindowsApp link correction, a compiled
+C++ root launcher, and creation + independent structural verification of
+`MEGAsyncPortable_6.7.1.0_b1r9_x64.zip`. On 21 Nov 2026 UTC the installer
+step failed before NSIS because pinned `Portable-Package-Builder@v1.0.0`
+`Test-RelativeEXE` accepts **Windows backslashes only** in `running-exe`.
+Both b1r9 workflows incorrectly sent `App/MEGAsync/MEGAsync.exe`.
+
+**b1r10 correction:** Both workflows send the exact action-compatible value
+`'App\MEGAsync\MEGAsync.exe'`, preflight the staged x64 PE, and reject
+misconfigured lock paths *before* invoking the shared installer. No change to
+MEGA Desktop compilation, Qt, WinRT, or user-data handling was necessary.
+
+**Fast repackage after a failed installer:** Run the packaging-only workflow with
+`source_run_id=44918203381`, blank `source_release_tag`, and
+`original_zip_sha256` copied from the original artifact's `ZIP-SHA256.txt`.
+The workflow downloads only `independently-validated-zip-installer-failed`
+from the **same repository and source-build workflow**, checks the run and
+both hashes, validates original package layout and x64 PE files, then invokes
+the pinned custom-NSIS installer action. No source recompilation is required.
+Keep publishing off until license terms and manual Windows sync tests pass.
+Source run artifact: https://github.com/vhick/MEGAsync-Community-PortableApps-Builder/actions/runs/44918203381/artifacts/14715192825
+
+**NOT YET VERIFIED:** b1r10 Windows installer execution, installation / upgrade,
+actual application GUI/synchronization functionality, profile isolation,
+ShellGuard and post-exit host behavior, and publisher dry-run / publication.
 
 ## b1r9: fix the WindowsApp compiler probe (21 Nov 2026)
 
@@ -36,8 +67,7 @@ namespace headers. Preserve the genuine WinRT activation and exception paths
 and the actual `target_link_libraries(... WindowsApp)` link test; do not create
 stub WinRT implementations or skip compilation. Regression tests now assert
 that the SDK header precedes `E_FAIL` and that both paths are still exercised.
-The WindowsApp test, full application build, launcher, installer and real sync
-are **NOT YET VERIFIED for b1r9**.
+Those stages had **NOT YET BEEN VERIFIED at the time b1r9 was prepared**; the subsequent b1r9 GitHub run did confirm source compilation and ZIP staging. Installer execution and real sync remain unverified.
 
 ## b1r8: WindowsApp C++/WinRT linkage (21 Nov 2026)
 
@@ -122,12 +152,24 @@ b1r4 keeps the same short paths but initializes `QT_ROOT`, `SOURCE_ROOT` and `BU
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Fix missing WinRT probe E_FAIL SDK header - b1r9`, commit, then **Push origin**.
-5. Open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build.
+4. In GitHub Desktop check all files, enter commit summary `Fix shared installer Windows path and add ZIP recovery - b1r10`, commit, then **Push origin**.
+5. For a **new full source build**, open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build. For an **installer-only retry of b1r9**, use the short recovery procedure directly below instead.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, `ZIP-SHA256.txt`, `compiler-compatibility.json`, and `winrt-link-compatibility.json`. On preflight failure, download `qt-msvc-compatibility-diagnostics` or `winrt-link-compatibility-diagnostics` to inspect the relevant compiler/linker logs. The app package is **not** this builder ZIP.
 8. Extract `MEGAsyncPortable_...zip` to an NTFS or ReFS folder and start **MEGAsyncPortable.exe**. Alternatively run the independent `.paf.exe` installer after separate installer acceptance.
 9. After complete Windows acceptance (see `docs/WINDOWS-TESTING.md`), you can rerun using `publish_release=true`, but ONLY if non-commercial distribution and notices are authorised. Then check your own repository's **Releases** section.
+
+## Fast installer-only retry of the existing b1r9 build
+
+Use this route to avoid recompiling the successfully built b1r9 MEGAsync application:
+
+1. Open GitHub Actions run `44918203381` in the **same repository** and download the `independently-validated-zip-installer-failed` artifact. Inside the artifact archive, open `ZIP-SHA256.txt` and copy the **64-character SHA-256 of `MEGAsyncPortable_6.7.1.0_b1r9_x64.zip`**. Do not copy the hash of the surrounding Actions artifact archive.
+2. After pushing b1r10, go to **Actions → MEGA Community PortableApps - trusted ZIP to installer only → Run workflow**.
+3. Set `source_run_id` to `44918203381`; leave `source_release_tag` blank; paste the ZIP hash into `original_zip_sha256`; leave `installer_package_revision` as `b1r10` and `publish_release` as `false`.
+4. The workflow checks the exact original build's repository, workflow identity, artifact name, hash and embedded source identity. It validates the staged executable before invoking `vhick/Portable-Package-Builder@v1.0.0` with the backslash-separated `running-exe`.
+5. On a successful run, download `MEGA-verified-repackage-b1r10` from the Actions run. It contains the **unchanged original b1r9 application ZIP** alongside the independently generated **b1r10 installer** and the original ZIP checksum. An installer-only revision does not imply the application was rebuilt as b1r10.
+
+If the artifact has expired, the workflow has lost permission to read it, or a hash mismatches, it stops without silently using another download source. Publishing remains off by default.
 
 ## Portable data and upgrades
 

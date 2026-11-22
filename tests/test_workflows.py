@@ -40,7 +40,7 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn('package-revision: ' + match.group(1), source)
         header=(ROOT / 'README.md').read_text(encoding='utf-8').splitlines()[0]
         self.assertIn('Kit — '+match.group(1), header)
-        self.assertNotIn('b1r1', source)
+        self.assertNotRegex(source, r'\bb1r1\b')
 
 
 if __name__ == '__main__':
