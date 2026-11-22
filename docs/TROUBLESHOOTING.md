@@ -1,3 +1,13 @@
+## b1r10 packaging-only incorrectly rejects the source run ID
+
+The uploaded `logs_121744908397.zip` confirms that `source_run_id=44918203381`,
+`installer_package_revision=b1r10`, and a 64-character ZIP SHA-256 were received.
+The workflow rejected the run at its provenance check because its regex required
+`/.github/...` even though GitHub returns `.github/...@main`. This is not a
+checksum failure. b1r11 uses `scripts/verify_source_run.py` to check the
+relative workflow path, repository, original run ID, manual event and canonical
+numeric workflow ID. Keep the exact SHA-256 and run ID; choose packaging-only.
+
 ## b1r9 installer reports "running-exe must be a relative Windows .exe file"
 
 The pinned shared action requires Windows backslashes. Both workflows now pass `App\MEGAsync\MEGAsync.exe` and test its existence and x64 PE structure first. The original b1r9 application ZIP was independently validated and uploaded as a workflow artifact, so use packaging-only with a `source_run_id` and an independently copied SHA-256 to rebuild ONLY the installer. This preserves the original source build and saves hosted Windows compilation time.

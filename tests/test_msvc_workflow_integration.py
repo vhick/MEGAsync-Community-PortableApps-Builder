@@ -29,7 +29,7 @@ class CompilerAdapterWorkflowTests(unittest.TestCase):
         self.assertIn('out/compiler-compatibility.json', data)
         stage = (ROOT / 'scripts/stage.py').read_text(encoding='utf-8')
         self.assertIn('COMPILER-COMPATIBILITY.json', stage)
-        self.assertIn("REV='b1r10'", stage)
+        self.assertIn("REV='b1r11'", stage)
 
 
 if __name__ == '__main__':

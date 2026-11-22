@@ -17,9 +17,9 @@ on:
         required: true
         type: string
       installer_package_revision:
-        description: 'New installer-only revision, e.g. b1r10'
+        description: 'New installer-only revision, e.g. b1r11'
         required: true
-        default: b1r10
+        default: b1r11
         type: string
       publish_release:
         description: 'Opt in to non-commercial GitHub Release publication'
@@ -71,12 +71,17 @@ jobs:
             # Inspect provenance, never accept another repository or arbitrary workflow.
             $runJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID"
             if ($LASTEXITCODE -ne 0) { throw 'Cannot verify original GitHub Actions run' }
-            $run = ($runJson -join "`n") | ConvertFrom-Json -Depth 20
-            if ($run.repository.full_name -ne $env:GITHUB_REPOSITORY -or
-                $run.path -notmatch '/\.github/workflows/build-portableapps\.yml@' -or
-                $run.event -ne 'workflow_dispatch') {
-              throw 'Source run does not belong to this builder source-build workflow'
-            }
+            # GitHub run.path is usually ".github/workflows/build-portableapps.yml@main".
+            # Do NOT require a leading slash: the b1r10 check rejected valid runs.
+            # Cross-check the numeric workflow ID against GitHub's official workflow record.
+            $workflowJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/build-portableapps.yml"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot verify canonical source workflow metadata' }
+            $runFile = Join-Path $env:RUNNER_TEMP 'mega-source-run.json'
+            $workflowFile = Join-Path $env:RUNNER_TEMP 'mega-source-workflow.json'
+            ($runJson -join "`n") | Set-Content -LiteralPath $runFile -Encoding utf8
+            ($workflowJson -join "`n") | Set-Content -LiteralPath $workflowFile -Encoding utf8
+            python scripts/verify_source_run.py --run-json "$runFile" --workflow-json "$workflowFile" --repository "$env:GITHUB_REPOSITORY" --run-id "$env:SOURCE_RUN_ID"
+            if ($LASTEXITCODE -ne 0) { throw 'Source run identity validation failed; see the detailed provenance error above' }
             gh run download "$env:SOURCE_RUN_ID" -R "$env:GITHUB_REPOSITORY" -n 'independently-validated-zip-installer-failed' -D out
             if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve original independently validated ZIP artifact' }
             if (-not (Test-Path 'out/ZIP-SHA256.txt' -PathType Leaf)) {

@@ -79,7 +79,7 @@ class SharedActionRunningExeTests(unittest.TestCase):
         t = (ROOT / '.github' / 'workflows' / 'packaging-only.yml').read_text(encoding='utf-8')
         for token in ('source_run_id:', "if ($hasTag -eq $hasRun)", 'gh run download',
                       "-n 'independently-validated-zip-installer-failed'", "'out/ZIP-SHA256.txt'",
-                      'run.repository.full_name', 'run.path', 'workflow_dispatch',
+                      'scripts/verify_source_run.py', 'actions/workflows/build-portableapps.yml',
                       'EXPECTED_SHA256', 'scripts/packaging_only.py', 'actions: read'):
             self.assertIn(token, t)
         self.assertIn('publish_release == true', t)

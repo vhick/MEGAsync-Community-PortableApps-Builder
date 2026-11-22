@@ -1,19 +1,21 @@
-# GitHub Desktop commit information — b1r9
+# GitHub Desktop commit — b1r11
 
-Repository: `MEGAsync-Community-PortableApps-Builder` (independent of MEGA upstream).
+**Summary**
 
-**Commit summary:**
+`Fix packaging-only GitHub run provenance check - b1r11`
 
-`Fix WinRT E_FAIL compiler probe missing SDK header - b1r9`
+**Description**
 
-**Description:**
+Fix b1r10 packaging-only run rejection caused by requiring a leading slash
+in the GitHub REST API workflow path.
 
-Fix the b1r8 WindowsApp preflight failure where the test program referenced E_FAIL without including its Windows SDK declaration, causing C2065 before linking.
+Verify the source run against the canonical GitHub workflow ID, repository,
+source run ID, manual dispatch status and exact build workflow path.
 
-Explicitly include winerror.h in the C++/WinRT probe, before use of E_FAIL. Preserve both tested runtime import paths and real WindowsApp.lib linkage; do not bypass the probe or suppress errors.
+Retain original ZIP SHA-256 and manifest verification, independently validated
+ZIP recovery, compiled launcher, and pinned shared installer/publisher.
 
-Add regression tests for the required header, include order and real WinRT probe/link coverage. Preserve the previous dynamic Qt/MSVC compatibility, vcpkg dependency and Windows path fixes, source-built application, portable data adapter, compiled launcher, installer, and release publisher.
+Add regression tests for relative-path workflow metadata, wrong workflow IDs,
+wrong repositories, wrong run IDs, and unintended workflow paths.
 
-Update package revision and documentation to b1r9.
-
-Run with publish_release=false using disposable test data; Windows application build, sync and installer have not yet passed.
+Update packaging-only default revision and builder release identity to b1r11.

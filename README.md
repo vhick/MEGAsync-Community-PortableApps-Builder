@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r10 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r11 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -7,7 +7,7 @@
 ## What is included
 
 - `.github/workflows/build-portableapps.yml`: independent official-tag discovery, pinned upstream source + SDK checkout, exact source data path patch, vcpkg/Qt setup, actual app source build, genuine MSVC C++ root launcher, completed PortableApps folder and validated ZIP, shared installer, dry-run, optional publication.
-- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation.
+- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation. Source-run provenance is checked against GitHub workflow metadata (corrected in b1r11).
 - `launcher/main.cpp` and `launcher/CMakeLists.txt`: real compiled Win64 launcher with pre-launch portable profile, job child tracking and simultaneous installed MEGA process guard. No host registry cleanup and no fake EXE.
 - `scripts/detect_msvc_qt_compat.py` and `scripts/qt_msvc_probe/`: real MSVC `/WX` compiler probes using the downloaded Qt SDK and Qt's `QList<QString>::operator==`. Leave the target unchanged when compatible; apply a verified fix only after diagnosing the exact known STL4043 failure.
 - `scripts/patch_msvc_qt_compat.py`: target-only, fail-closed compatibility adapter called **conditionally by the Qt probe**, never unconditionally by the workflow.
@@ -17,8 +17,36 @@
 - `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
 - `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
-- `tests/`: 57 deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
+- `tests/`: deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
+
+## b1r11: fix false source-run rejection in packaging-only recovery (22 Nov 2026)
+
+**FAILED/BLOCKED (real user run):** Uploaded `logs_121744908397.zip` shows
+packaging-only `source_run_id=44918203381` and a 64-character checksum reaching
+the Windows runner, then failing on `Source run does not belong to this builder
+source-build workflow`. The b1r10 PowerShell regex incorrectly required a leading
+slash before `.github/workflows/build-portableapps.yml@...`. GitHub's REST API
+returns a workflow `path` relative to the repository root, normally
+`.github/workflows/build-portableapps.yml@main`. The run failed **before** the
+original ZIP download, checksum verification, NSIS compilation or publication;
+the user's supplied checksum was not proven wrong.
+
+**Fix:** `scripts/verify_source_run.py` now validates the returned run ID,
+repository, completed manual-dispatch status, anchored documented workflow path,
+and numeric workflow ID against a second official `GET /actions/workflows/build-portableapps.yml`
+response. It accepts the documented repository-relative path and the optional
+legacy leading-slash form but rejects unrelated workflow paths. The workflow
+still retrieves only the named artifact from the same repository, verifies its
+original `ZIP-SHA256.txt` and the user-supplied hash, and validates the ZIP layout
+before running the pinned shared Package Builder. No MEGAsync source rebuild
+is necessary. This compatibility fix has passed local fixtures, not a hosted
+Windows re-run.
+
+**Repackage settings:** Leave `source_release_tag` blank; use
+`source_run_id=44918203381`; paste the exact `original_zip_sha256` from
+`ZIP-SHA256.txt`; leave `installer_package_revision=b1r11` and
+`publish_release=false`. Do not use the outer GitHub artifact digest.
 
 ## b1r10: Windows build success, shared-installer path correction and fast recovery (22 Nov 2026)
 

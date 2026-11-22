@@ -1,10 +1,29 @@
+## b1r10 packaging-only provenance rejection / b1r11 correction (22 November 2026)
+
+**FAILED/BLOCKED (real GitHub Actions run, user-provided log):**
+`logs_121744908397.zip` records `SOURCE_RUN_ID=44918203381`,
+`NEW_REVISION=b1r10`, and a 64-hex SHA256. After checking out the builder,
+`Fetch exact same-repository release ZIP` threw `Source run does not belong to
+this builder source-build workflow` in its original inline regex. The path
+check required a leading `/` before `.github`, whereas the documented GitHub
+REST run `path` is `.github/workflows/build-portableapps.yml@main`.
+Original ZIP download/hash validation and NSIS installer generation were NOT
+reached. The checksum is not independently validated by this failed run.
+
+**STATIC-VALIDATED (b1r11 local fixtures):** Added exact run/workflow identity
+verification against GitHub API responses including ID, repository, relative
+path, manual-dispatch event and completed state, without weakening the original
+SHA, artifact-name, source identity or package checks. GitHub API acceptance,
+artifact recovery, NSIS execution and interactive runtime safety remain
+NOT YET VERIFIED until a new Windows run is performed.
+
 ## b1r9 Windows build evidence, 21 November 2026 UTC
 
 User-supplied `logs_121571335574.zip` confirms MEGAsync application x64 source compilation, the native C++ root launcher compilation, and independent PortableApps ZIP verification. The pinned shared Package Builder rejected forward slashes in its `running-exe` input. The workflow uploaded `independently-validated-zip-installer-failed` as a recoverable artifact from run `44918203381`. Installer generation and running MEGA were NOT verified.
 
 b1r10 uses Windows-style `App\MEGAsync\MEGAsync.exe`, adds source-input preflight, and permits same-run repository artifact recovery without recompiling upstream. These changes have local fixture validation only until next hosted Windows run.
 
-# Evidence and verification matrix — kit b1r10
+# Evidence and verification matrix — kit b1r11
 
 | Stage | Latest supported status |
 |---|---|
