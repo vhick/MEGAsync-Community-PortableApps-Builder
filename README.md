@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r15 (b1r14 working baseline; b1r15 runtime unverified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r16 (b1r14 working baseline; b1r16 runtime unverified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -29,7 +29,7 @@
 
 **ICON UPDATE:** Generate a distinctive red, rounded-square MP community monogram rather than the old blue cloud. Generate transparent 16/32/75/128/256 PNGs and a six-resolution Windows ICO. The launcher embeds exactly that ICO through `portable_icon.rc`; `stage.py` checks byte identity with the menu ICO. Never substitute MEGA's official trademarked icon; upstream `LICENCE.md` grants no use of its marks. The app's original binary and profile handling are unchanged.
 
-**FAST LAUNCHER-ONLY REBUILD:** Push b1r15, open **Actions → MEGA Community PortableApps - update launcher and icons (no app rebuild)**, enter the GitHub Actions **successful b1r13 source-build run ID** and **SHA-256 of the original b1r13 application ZIP** (from `ZIP-SHA256.txt` inside that run's artifact), and leave `publish_release=false`. The dedicated workflow validates GitHub source-run provenance, downloads the exact unpublished source ZIP, verifies SHA-256 and required `.rcc` files, builds only the C++ launcher and its artwork, creates the b1r15 ZIP and shared custom-NSIS installer, and preserves the original `App/MEGAsync/` application files byte-for-byte. If the original source-build run was not successful or its ZIP is missing/expired, use the full source-build workflow. The launcher-only cache-adjusted workflow is **NOT YET VERIFIED on a hosted Windows runner**.
+**FAST LAUNCHER-ONLY REBUILD (b1r16):** Push this kit, open **Actions → MEGA Community PortableApps - update launcher and icons (no app rebuild)**, enter the successful source-build **Run ID** (`44997000086` for the user-confirmed b1r14 source build) and original portable application ZIP **SHA-256** (`4054acf34aae7eef26adbb870b2995b51a37b2cd473e534c72c09b44f2c23e07` for that b1r14 release). Leave `source_release_tag` blank: the workflow first checks an unexpired unpublished Actions artifact, then automatically discovers the matching published GitHub Release using the exact source-run link. Alternatively, set the exact release tag and omit Run ID. It verifies the release's repository, tag, asset filename, digest when provided, published checksum manifest, embedded upstream SHA and builder revision before reusing the original source-built binaries. It then recompiles **only the C++ launcher and icon**, retaining `App/MEGAsync` byte-for-byte, and generates the ZIP and custom-NSIS installer. **No Windows execution of b1r16 has yet been verified.**
 
 **INSTALL/UPGRADE:** Close all MEGAsync background/tray processes before replacing package binaries. Never delete `Data/`. Refresh the PortableApps menu with **Apps → Refresh App Icons** (PortableApps Platform support guidance) and reopen it if Windows icon caching retains the old artwork. The new red design is an original community icon, not the official MEGA icon. GUI/runtime tests remain manual acceptance steps.
 
@@ -201,6 +201,17 @@ b1r3 introduced three `${{ runner.temp }}` expressions under `jobs.build.env` wh
 
 b1r4 keeps the same short paths but initializes `QT_ROOT`, `SOURCE_ROOT` and `BUILD_ROOT` in the first PowerShell step *after checkout*, using Windows' `RUNNER_TEMP` variable. The step writes those values into `GITHUB_ENV` for subsequent steps. Added focused GitHub expression-context regression tests. This fixes the invalid-workflow declaration, **not** the unverified application compilation or runtime portability. Existing failed runs remain in GitHub Actions history.
 
+
+## b1r16: published GitHub Release reuse (fix for logs_121850625114.zip)
+
+**Observed failure:** The b1r15 launcher-only workflow trusted source run `44997000086` but stopped with `Expected exactly one unexpired validated unpublished source ZIP artifact; found 0`. The user supplied the correct run ID and a valid 64-character SHA-256. The original source-build published a GitHub Release but did not upload an unpublished Actions artifact. The failure occurred before any ZIP download or launcher compilation.
+
+**Correction:** The b1r16 launcher-only workflow tries the same-repository validated Actions artifact first. If none exists, it selects **exactly one published release** linked to the verified source-build Run ID, or the exact `source_release_tag` explicitly provided by the user. It rejects drafts/prereleases, wrong repositories, mismatched tags/asset versions, ambiguous releases, changed release asset digests, wrong `SHA256SUMS.txt` entries, and mismatches between tag upstream SHA and `Other/Source/BUILD-IDENTITY.json`. The original ZIP must also match the user-supplied SHA-256 before extraction. The workflow does not automatically trust whatever GitHub labels “latest.” If no matching trusted source is available, the process stops without repackaging or publishing.
+
+**For the currently published b1r14 application:** `source_run_id=44997000086`, `source_release_tag` blank, `original_zip_sha256=4054acf34aae7eef26adbb870b2995b51a37b2cd473e534c72c09b44f2c23e07`, `publish_release=false`. The exact b1r14 release tag is `mega-portable-v6.7.1.0-b1r14-650c9a2df326d7bf28d64e9f6e1588998757a862` if the user prefers explicit-tag selection. The resulting output has **b1r16** identity while preserving all original `App/MEGAsync` binary contents.
+
+**Testing status:** Published-release API/download and Windows launcher compilation remain NOT YET VERIFIED. Local metadata selection and checksum/identity tests are fixtures, not a live GitHub release download.
+
 ## Prerequisites
 
 - A new standalone GitHub repository containing this kit, public or private at your discretion.
@@ -213,14 +224,14 @@ b1r4 keeps the same short paths but initializes `QT_ROOT`, `SOURCE_ROOT` and `BU
 1. On GitHub, create a **new repository** such as `MEGAsync-Community-PortableApps-Builder`. Do **not** fork `meganz/MEGAsync`.
 2. Consider **Private** initially, while checking runtime and licensing. In GitHub Desktop select **File → Clone Repository**, select this new repo.
 3. Extract the builder ZIP into the CLONED REPOSITORY ROOT (not into an extra subfolder). Enable hidden files so `.github/workflows` is copied intact.
-4. In GitHub Desktop check all files, enter commit summary `Fix shared installer Windows path and add ZIP recovery - b1r10`, commit, then **Push origin**.
-5. For a **new full source build**, open GitHub repository → **Actions** → `MEGA Desktop Community PortableApps - source build` → **Run workflow**. Leave `upstream_version` blank to choose the newest stable Windows tag; set `publish_release=false` for the first build. For an **installer-only retry of b1r9**, use the short recovery procedure directly below instead.
+4. In GitHub Desktop commit with summary `Fix launcher-only recovery from published GitHub Releases - b1r16`, then **Push origin**.
+5. For this cache/launcher update, use **Actions → MEGA Community PortableApps - update launcher and icons (no app rebuild)**. Provide source run `44997000086`, the matching b1r14 ZIP SHA-256 shown in the fast launcher-only section, and leave `source_release_tag` blank and `publish_release=false`. Only use the full source-build workflow when no verified original ZIP is available.
 6. Follow each step's green/red status. A failed `Install verified-route Qt`, `Build actual MEGA Desktop application`, or `Stage and independently validate ZIP` step indicates no complete package; do not use partial outputs.
 7. On success and publish disabled, download the workflow artifact from the completed run. It contains the ZIP, installer, `ZIP-SHA256.txt`, `compiler-compatibility.json`, and `winrt-link-compatibility.json`. On preflight failure, download `qt-msvc-compatibility-diagnostics` or `winrt-link-compatibility-diagnostics` to inspect the relevant compiler/linker logs. The app package is **not** this builder ZIP.
 8. Extract `MEGAsyncPortable_...zip` to an NTFS or ReFS folder and start **MEGAsyncPortable.exe**. Alternatively run the independent `.paf.exe` installer after separate installer acceptance.
 9. After complete Windows acceptance (see `docs/WINDOWS-TESTING.md`), you can rerun using `publish_release=true`, but ONLY if non-commercial distribution and notices are authorised. Then check your own repository's **Releases** section.
 
-## Fast installer-only retry of the existing b1r9 build
+## Historical b1r9 installer-only retry (not required for the b1r16 launcher update)
 
 Use this route to avoid recompiling the successfully built b1r9 MEGAsync application:
 
@@ -265,7 +276,7 @@ The local authoring tests included: Python syntax, resolver test fixtures, patch
 Read `docs/AUDIT.md`, `docs/WINDOWS-TESTING.md`, and `docs/EVIDENCE.md` before using real cloud data.
 
 
-## b1r15 — portable Qt QML and shader caches (user-observed host traces)
+## b1r16 — portable Qt QML and shader caches (user-observed host traces)
 
 The latest user-confirmed working baseline was b1r14. A real Windows inspection subsequently
 found Qt-generated host paths:
@@ -273,7 +284,7 @@ found Qt-generated host paths:
 - `%LOCALAPPDATA%\Mega Limited\MEGAsync\cache\qmlcache` — QML compilation cache.
 - `%LOCALAPPDATA%\cache\qtshadercache-x86_64-little_endian-llp64` — Qt OpenGL shared shader cache (sometimes only an empty folder).
 
-The b1r15 C++ launcher sets **per-process** environment settings before `CreateProcessW`:
+The b1r16 C++ launcher sets **per-process** environment settings before `CreateProcessW`:
 
 - `QML_DISK_CACHE_PATH=<PortableRoot>\Data\Cache\QML`: preserves QML cache persistence and avoids the ordinary host cache.
 - `QT_DISABLE_SHADER_DISK_CACHE=1` and `QSG_RHI_DISABLE_SHADER_DISK_CACHE=1`: disables optional shared shader disk caching to avoid unrelated host cache ownership and deletion hazards. This may slightly increase shader compilation time; rendering itself remains enabled.
@@ -283,9 +294,9 @@ The above is source-inspected and statically tested, **not yet user-confirmed on
 
 ### Recommended fast update (do not rebuild MEGAsync)
 
-1. Commit the full b1r15 builder and push.
+1. Commit the full b1r16 builder and push.
 2. Open GitHub Actions → **MEGA Community PortableApps - update launcher and icons (no app rebuild)**.
-3. Supply the **original successful source-build run ID** and original validated application ZIP SHA-256; b1r13 source output is appropriate if it still exists.
+3. Supply the **original successful source-build Run ID** and original validated application ZIP SHA-256. The published b1r14 release is supported by b1r16 and is preferred over relying on an expired b1r13 Actions artifact.
 4. The workflow reuses the existing app files and all five RCC resources, builds only the C++ launcher with updated cache controls and the same red M icon, revalidates and creates ZIP and installer. No source rebuild.
 5. Save a backup of the installed `MEGAsyncPortable\Data` before replacing any binaries; close MEGA from the tray. Test on disposable sync folders before normal use.
 6. Use `docs/WINDOWS-TESTING.md` to verify no **new** cache files appear in the two host locations during fresh launches. Do not auto-delete anything from host paths.

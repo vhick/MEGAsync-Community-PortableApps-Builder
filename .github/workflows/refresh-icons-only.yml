@@ -3,11 +3,17 @@ on:
   workflow_dispatch:
     inputs:
       source_run_id:
-        description: 'Successful previous MEGAsync source-build Actions run ID (unpublished ZIP artifact)'
-        required: true
+        description: 'Previous successful source-build Run ID (can also locate matching published release)'
+        required: false
+        default: ''
+        type: string
+      source_release_tag:
+        description: 'Optional exact published GitHub Release tag; leave blank to find release by source Run ID'
+        required: false
+        default: ''
         type: string
       original_zip_sha256:
-        description: "SHA-256 of that run's original MEGAsyncPortable ZIP, not the outer artifact"
+        description: "Original MEGAsyncPortable ZIP SHA-256 (Actions artifact or published release)"
         required: true
         type: string
       publish_release:
@@ -41,41 +47,83 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check -r requirements-build.txt
           if ($LASTEXITCODE -ne 0) { throw 'Icon builder dependency setup failed' }
-      - name: Download verified previously compiled application ZIP
+      - name: Recover verified application ZIP from Actions artifact or published release
         shell: pwsh
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_RELEASE_TAG: ${{ inputs.source_release_tag }}
           EXPECTED_SHA256: ${{ inputs.original_zip_sha256 }}
         run: |
-          if ($env:SOURCE_RUN_ID -notmatch '^[1-9][0-9]{0,18}$') { throw 'Invalid original source run ID' }
           if ($env:EXPECTED_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Original application ZIP SHA-256 must be 64 hexadecimal characters' }
-          $runJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID"
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source run metadata' }
-          $workflowJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/build-portableapps.yml"
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source workflow metadata' }
+          if ($env:SOURCE_RUN_ID -and $env:SOURCE_RUN_ID -notmatch '^[1-9][0-9]{0,18}$') { throw 'Invalid original source Run ID' }
+          if (-not $env:SOURCE_RUN_ID -and -not $env:SOURCE_RELEASE_TAG) { throw 'Provide a source Run ID or exact published release tag' }
           New-Item -ItemType Directory -Force -Path original | Out-Null
-          ($runJson -join "`n") | Set-Content original/source-run.json -Encoding utf8
-          ($workflowJson -join "`n") | Set-Content original/source-workflow.json -Encoding utf8
-          python scripts/verify_source_run.py --run-json original/source-run.json --workflow-json original/source-workflow.json --repository "$env:GITHUB_REPOSITORY" --run-id "$env:SOURCE_RUN_ID"
-          if ($LASTEXITCODE -ne 0) { throw 'Wrong source run, repository or workflow' }
-          $run = ($runJson -join "`n") | ConvertFrom-Json
-          if ($run.conclusion -ne 'success') { throw 'The launcher-refresh workflow requires a successful original source-build run' }
-          $artifactJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID/artifacts?per_page=100"
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect original run artifacts' }
-          $artifacts = ($artifactJson -join "`n") | ConvertFrom-Json
-          $matches = @($artifacts.artifacts | Where-Object { $_.name -match '^MEGAsyncPortable-[0-9]+(\.[0-9]+){3}-b1r[0-9]+-unpublished$' -and -not $_.expired })
-          if ($matches.Count -ne 1) { throw "Expected exactly one unexpired validated unpublished source ZIP artifact; found $($matches.Count)" }
-          gh run download "$env:SOURCE_RUN_ID" -R "$env:GITHUB_REPOSITORY" -n "$($matches[0].name)" -D original
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot download original validated source-build artifact' }
+          $artifactFound = $false
+          if ($env:SOURCE_RUN_ID) {
+            $runJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source run metadata' }
+            $workflowJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/build-portableapps.yml"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source workflow metadata' }
+            ($runJson -join "`n") | Set-Content original/source-run.json -Encoding utf8
+            ($workflowJson -join "`n") | Set-Content original/source-workflow.json -Encoding utf8
+            python scripts/verify_source_run.py --run-json original/source-run.json --workflow-json original/source-workflow.json --repository "$env:GITHUB_REPOSITORY" --run-id "$env:SOURCE_RUN_ID"
+            if ($LASTEXITCODE -ne 0) { throw 'Wrong source run, repository or workflow' }
+            $run = ($runJson -join "`n") | ConvertFrom-Json
+            if ($run.conclusion -ne 'success') { throw 'Launcher-only update requires a successful original source-build run' }
+            $artifactJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID/artifacts?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect original run artifacts' }
+            $artifacts = ($artifactJson -join "`n") | ConvertFrom-Json
+            $matches = @($artifacts.artifacts | Where-Object { $_.name -match '^MEGAsyncPortable-[0-9]+(\.[0-9]+){3}-b1r[0-9]+-unpublished$' -and -not $_.expired })
+            if ($matches.Count -gt 1) { throw 'Ambiguous source-run artifact: expected one validated ZIP artifact' }
+            if ($matches.Count -eq 1) {
+              gh run download "$env:SOURCE_RUN_ID" -R "$env:GITHUB_REPOSITORY" -n "$($matches[0].name)" -D original
+              if ($LASTEXITCODE -ne 0) { throw 'Failed downloading original validated source-build artifact' }
+              $artifactFound = $true
+              Write-Host "Recovered validated unpublished source ZIP artifact from run $env:SOURCE_RUN_ID"
+            } else {
+              Write-Host 'No unexpired unpublished artifact; checking the matching published release instead.'
+            }
+          }
+          if (-not $artifactFound) {
+            # Never fetch the latest release blindly. Select from this exact repository
+            # by the trusted source run link or an explicitly supplied full release tag.
+            if ($env:SOURCE_RELEASE_TAG) {
+              $releaseJson = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:SOURCE_RELEASE_TAG"
+              if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect requested release tag' }
+              ($releaseJson -join "`n") | Set-Content original/source-releases.json -Encoding utf8
+            } else {
+              $allReleases = @()
+              $complete = $false
+              for ($page=1; $page -le 10; $page++) {
+                $pageJson = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100&page=$page"
+                if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect builder repository releases' }
+                $items = @(($pageJson -join "`n") | ConvertFrom-Json)
+                $allReleases += $items
+                if ($items.Count -lt 100) { $complete = $true; break }
+              }
+              if (-not $complete) { throw 'More than 1000 releases; provide an exact release tag to avoid an incomplete search' }
+              ConvertTo-Json -InputObject @($allReleases) -Depth 40 | Set-Content original/source-releases.json -Encoding utf8
+            }
+            python scripts/verify_release_source.py select --metadata-json original/source-releases.json --repository "$env:GITHUB_REPOSITORY" --sha256 "$env:EXPECTED_SHA256" --source-run-id "$env:SOURCE_RUN_ID" --tag "$env:SOURCE_RELEASE_TAG" --plan original/VERIFIED-RELEASE-ASSET.json
+            if ($LASTEXITCODE -ne 0) { throw 'Could not match a trusted published source release to this run and checksum' }
+            $plan = Get-Content original/VERIFIED-RELEASE-ASSET.json -Encoding utf8 | ConvertFrom-Json
+            gh release download "$($plan.tag)" -R "$env:GITHUB_REPOSITORY" --pattern "$($plan.zip_filename)" --pattern 'SHA256SUMS.txt' --dir original
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot download exact release ZIP and SHA256SUMS.txt' }
+            python scripts/verify_release_source.py verify --plan original/VERIFIED-RELEASE-ASSET.json --directory original
+            if ($LASTEXITCODE -ne 0) { throw 'Published release ZIP integrity or build identity failed' }
+          } else {
+            $zips = @(Get-ChildItem original -Filter 'MEGAsyncPortable_*_b1r*_x64.zip' -File)
+            if ($zips.Count -ne 1) { throw 'Expected exactly one original source-run application ZIP' }
+            $manifest = @(Get-Content original/ZIP-SHA256.txt -Encoding utf8)
+            if ($manifest.Count -ne 1) { throw 'Missing original source-run ZIP checksum manifest' }
+            $expectedLine = '^([a-fA-F0-9]{64})\s+(MEGAsyncPortable_[0-9.]+_b1r[0-9]+_x64\.zip)$'
+            $m = [regex]::Match($manifest[0], $expectedLine)
+            if (-not $m.Success -or $m.Groups[2].Value -ne $zips[0].Name -or $m.Groups[1].Value.ToLowerInvariant() -ne $env:EXPECTED_SHA256.ToLowerInvariant()) { throw 'Original Actions artifact ZIP checksum manifest mismatch' }
+          }
           $zips = @(Get-ChildItem original -Filter 'MEGAsyncPortable_*_b1r*_x64.zip' -File)
-          if ($zips.Count -ne 1) { throw 'Expected exactly one application ZIP from original run' }
-          $manifest = @(Get-Content original/ZIP-SHA256.txt -Encoding utf8)
-          if ($manifest.Count -ne 1) { throw 'Missing single-line original ZIP SHA-256 manifest' }
-          $expectedLine = '^([a-fA-F0-9]{64})\s+(MEGAsyncPortable_[0-9.]+_b1r[0-9]+_x64\.zip)$'
-          $m = [regex]::Match($manifest[0], $expectedLine)
-          if (-not $m.Success -or $m.Groups[2].Value -ne $zips[0].Name -or $m.Groups[1].Value.ToLowerInvariant() -ne $env:EXPECTED_SHA256.ToLowerInvariant()) { throw 'Original ZIP SHA256 manifest identity mismatch' }
+          if ($zips.Count -ne 1) { throw 'Expected exactly one verified application ZIP before extracting' }
           python scripts/packaging_only.py --zip "$($zips[0].FullName)" --sha256 "$env:EXPECTED_SHA256" --out out --env "$env:GITHUB_ENV"
-          if ($LASTEXITCODE -ne 0) { throw 'Original app ZIP checksum and resource validation failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Original application ZIP checksum and PortableApps resource validation failed' }
       - name: Rebuild C++ launcher with portable Qt caches and icon (no app rebuild)
         shell: pwsh
         run: |
@@ -108,7 +156,7 @@ jobs:
           source-dir: out/MEGAsyncPortable
           output-dir: out/installers
           engine: custom-nsis
-          package-revision: b1r15
+          package-revision: b1r16
           running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
       - name: Verify generated installer checksum and x64 application
@@ -128,9 +176,9 @@ jobs:
         if: steps.installer.outcome != 'success' || steps.validate_installer.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: MEGA-launcher-only-b1r15-installer-failed
+          name: MEGA-launcher-only-b1r16-installer-failed
           path: |
-            out/MEGAsyncPortable_*_b1r15_x64.zip
+            out/MEGAsyncPortable_*_b1r16_x64.zip
             out/ZIP-SHA256.txt
           if-no-files-found: error
       - name: Block publication if installer failed
@@ -141,10 +189,10 @@ jobs:
         uses: vhick/portable-release-publisher@v1.1.1
         with:
           files: |
-            out/MEGAsyncPortable_*_b1r15_x64.zip
+            out/MEGAsyncPortable_*_b1r16_x64.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r15-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r15
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r16-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r16
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -154,10 +202,10 @@ jobs:
         uses: vhick/portable-release-publisher@v1.1.1
         with:
           files: |
-            out/MEGAsyncPortable_*_b1r15_x64.zip
+            out/MEGAsyncPortable_*_b1r16_x64.zip
             out/installers/*.exe
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r15-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r15
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r16-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable launcher refresh ${{ env.APP_VERSION }} b1r16
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -166,9 +214,9 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGA-launcher-only-b1r15-unpublished
+          name: MEGA-launcher-only-b1r16-unpublished
           path: |
-            out/MEGAsyncPortable_*_b1r15_x64.zip
+            out/MEGAsyncPortable_*_b1r16_x64.zip
             out/installers/*.exe
             out/ZIP-SHA256.txt
           if-no-files-found: error

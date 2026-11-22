@@ -1,3 +1,13 @@
+## 22 November 2026 — b1r16 published release recovery
+
+**USER-SUPPLIED WINDOWS LOG:** `logs_121850625114.zip`: source run `44997000086` identified and trusted, but no matching *unpublished* Actions artifact (`found 0`). No source ZIP was downloaded and the launcher-only build was not attempted. Public b1r14 source-build run points to a published GitHub Release instead, and the run page lists `Artifacts –`.
+
+**STATIC-VALIDATED CODE:** Added published release discovery with exact source-run backlink or specified tag; same-repository checks; asset and published `SHA256SUMS.txt` verification; upstream SHA and builder revision verification. No automatic unsafe fallback to unverified latest or arbitrary mirrors.
+
+**NOT YET VERIFIED:** Actual GitHub API release recovery, hosted Windows launcher compilation, installer creation, cache containment and functional synchronization for b1r16. b1r14 remains the latest user-confirmed working Windows release.
+
+---
+
 ## 22 November 2026 — b1r15 Qt host-cache remediation
 
 **USER-OBSERVED:** After user-confirmed b1r14 startup and red icon, the
