@@ -61,6 +61,16 @@ jobs:
             Write-Host "Initialized $($entry.Key)=$value"
           }
 
+      # Install both the test-time Pillow asset generator and later aqtinstall
+      # before executing tests. Hosted Windows runners do not guarantee Pillow.
+      - name: Install pinned Python test and build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Python test/build dependency installation failed' }
+          python -c "import PIL; import aqt; print('Python image and Qt build helpers available')"
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency import preflight failed' }
+
       - name: Test resolver and fail-closed source patch fixture
         shell: pwsh
         run: |
@@ -102,11 +112,10 @@ jobs:
           python scripts/patch_source.py "$env:SOURCE_ROOT"
           if ($LASTEXITCODE -ne 0) { throw 'Source patch failed' }
 
-      - name: Install verified-route Qt 5.15.2 and build helpers
+      - name: Install verified-route Qt 5.15.2
         shell: pwsh
         run: |
-          python -m pip install -r requirements-build.txt
-          if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed' }
+          # Python tooling was installed before the test suite ran.
           python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -O "$env:QT_ROOT"
           if ($LASTEXITCODE -ne 0) { throw 'Official Qt package retrieval failed' }
           $qt = Join-Path $env:QT_ROOT '5.15.2/msvc2019_64'
@@ -266,7 +275,7 @@ jobs:
           engine: custom-nsis
           running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
-          package-revision: b1r12
+          package-revision: b1r13
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -307,8 +316,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r12-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r12
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r13-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r13
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -323,8 +332,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r12-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r12
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r13-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r13
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -334,7 +343,7 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r12-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r13-unpublished
           path: |
             out/*.zip
             out/installers/*.exe

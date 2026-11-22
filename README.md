@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r12 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r13 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -7,7 +7,7 @@
 ## What is included
 
 - `.github/workflows/build-portableapps.yml`: independent official-tag discovery, pinned upstream source + SDK checkout, exact source data path patch, vcpkg/Qt setup, actual app source build, genuine MSVC C++ root launcher, completed PortableApps folder and validated ZIP, shared installer, dry-run, optional publication.
-- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation. Source-run provenance is checked against GitHub workflow metadata (corrected in b1r12).
+- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation. Source-run provenance is checked against GitHub workflow metadata (corrected in b1r11).
 - `launcher/main.cpp` and `launcher/CMakeLists.txt`: real compiled Win64 launcher with pre-launch portable profile, job child tracking and simultaneous installed MEGA process guard. No host registry cleanup and no fake EXE.
 - `scripts/detect_msvc_qt_compat.py` and `scripts/qt_msvc_probe/`: real MSVC `/WX` compiler probes using the downloaded Qt SDK and Qt's `QList<QString>::operator==`. Leave the target unchanged when compatible; apply a verified fix only after diagnosing the exact known STL4043 failure.
 - `scripts/patch_msvc_qt_compat.py`: target-only, fail-closed compatibility adapter called **conditionally by the Qt probe**, never unconditionally by the workflow.
@@ -19,6 +19,14 @@
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
 - `tests/`: deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
+
+## b1r13: Windows runner bootstrap and path-alias regression repair (22 November 2026)
+
+**ACTUAL FAILURE:** Uploaded `logs_121755836431.zip` shows the b1r12 GitHub Actions run failed in the initial `Test resolver and fail-closed source patch fixture` step. Exactly two of 80 tests failed; no Qt source build, launcher build, installer or publication was attempted. One test assumed a `Path.resolve()` result and the original test staging path would have the same spelling, but Windows' `RUNNER~1` / `runneradmin` DOS short/long folder names can identify the same underlying file. The other test invoked `scripts/make_icons.py` before the runner installed pinned `Pillow==11.3.0`, so `from PIL import Image` raised `ModuleNotFoundError`.
+
+**FIX:** Install `requirements-build.txt` once immediately after checkout/path initialization, before the fixture tests. Fail explicitly if Pillow or aqt cannot be imported. Avoid re-installing the same requirements again at the Qt acquisition step. Change only the test's comparison to `actual.samefile(expected)` so Windows filesystem identity is checked; retain the actual installer's realpath/PE/containment safety checks. Add bootstrap regression tests to ensure test/build dependency installation always precedes the test suite.
+
+**RUNTIME STATUS:** This run was blocked before compilation. The b1r12 fixes for five RCC resources and the embedded community launcher icon remain intact but are still not verified in a completed b1r13 Windows build or user-tested executable. Use a full source build with publishing off; do not repackage a previously incomplete ZIP.
 
 ## b1r12: fix confirmed missing runtime Qt resources and embed launcher icon (22 November 2026)
 
@@ -57,8 +65,8 @@ Windows re-run.
 
 **Repackage settings:** Leave `source_release_tag` blank; use
 `source_run_id=44918203381`; paste the exact `original_zip_sha256` from
-`ZIP-SHA256.txt`; leave `installer_package_revision=b1r12` and
-`publish_release=false`. Do not use the outer GitHub artifact digest.
+`ZIP-SHA256.txt`; use the historical `installer_package_revision=b1r11` and
+`publish_release=false`. This historical recovery procedure cannot fix the missing `.rcc` files in the old application ZIP. For a usable package, run the full b1r13 build; do not use the outer GitHub artifact digest.
 
 ## b1r10: Windows build success, shared-installer path correction and fast recovery (22 Nov 2026)
 

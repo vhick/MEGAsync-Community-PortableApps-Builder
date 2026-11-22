@@ -1,6 +1,6 @@
 """Assemble and independently validate the source-built PortableApps ZIP."""
 import argparse, hashlib, json, pathlib, re, shutil, subprocess, sys, zipfile
-ROOT='MEGAsyncPortable'; REV='b1r12'
+ROOT='MEGAsyncPortable'; REV='b1r13'
 EXPECTED_RCC = ('Resources_common.rcc','Resources_qml.rcc','Resources_light.rcc','Resources_dark.rcc','qml.rcc')
 RESOURCE_MANIFEST = f'{ROOT}/Other/Source/RCC-RESOURCE-MANIFEST.json'
 def sha256(p):

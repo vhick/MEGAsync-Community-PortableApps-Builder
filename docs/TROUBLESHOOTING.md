@@ -1,3 +1,11 @@
+## b1r12 Windows CI tests fail before compilation (two failures)
+
+The actual runner log `logs_121755836431.zip` failed 2 of 80 pre-build tests:
+1. `test_pinned_windows_relative_path_is_accepted` compared Windows `runneradmin` vs `RUNNER~1` path text. b1r13 instead checks the underlying file with `Path.samefile()`. The installer path validation still requires the same allowed relative executable, real file containment and x64 PE header.
+2. `test_asset_generation_produces_multiresolution_ico` raised `ModuleNotFoundError: No module named PIL`. b1r13 installs the pinned requirements (including Pillow) and checks imports before the entire test suite and Qt acquisition.
+
+This was a test-environment failure, not a MEGA runtime failure. Run the FULL source-build workflow on b1r13 with publishing disabled; older ZIP files remain incomplete and cannot be made functional by installer-only packaging.
+
 ## Runtime: "Error loading application resources" (b1r11 and earlier)
 
 The user-observed MEGAsync log contains `Missing resource file` for `Resources_common.rcc`, `Resources_qml.rcc`, `qml.rcc`, and `Resources_dark.rcc`. Upstream also builds `Resources_light.rcc`. b1r12 copies all five source-built .rcc files from the compiled executable folder to `App/MEGAsync` and checks their `qres` magic and SHA-256. This must not be confused with windeployqt: Qt framework DLL deployment alone is insufficient.
@@ -16,11 +24,11 @@ The workflow rejected the run at its provenance check because its regex required
 `/.github/...` even though GitHub returns `.github/...@main`. This is not a
 checksum failure. b1r12 uses `scripts/verify_source_run.py` to check the
 relative workflow path, repository, original run ID, manual event and canonical
-numeric workflow ID. Keep the exact SHA-256 and run ID; choose packaging-only.
+numeric workflow ID. Keep the exact SHA-256 and run ID only for historical installer testing; the old package lacks the required Qt RCC resources and must not be treated as a usable runtime package. Use the full b1r13 source build for the corrected application.
 
 ## b1r9 installer reports "running-exe must be a relative Windows .exe file"
 
-The pinned shared action requires Windows backslashes. Both workflows now pass `App\MEGAsync\MEGAsync.exe` and test its existence and x64 PE structure first. The original b1r9 application ZIP was independently validated and uploaded as a workflow artifact, so use packaging-only with a `source_run_id` and an independently copied SHA-256 to rebuild ONLY the installer. This preserves the original source build and saves hosted Windows compilation time.
+The pinned shared action requires Windows backslashes. Both workflows now pass `App\MEGAsync\MEGAsync.exe` and test its existence and x64 PE structure first. The original b1r9 application ZIP was independently validated and uploaded as a workflow artifact, so use packaging-only with a `source_run_id` and an independently copied SHA-256 to rebuild ONLY the installer. This was a valid workaround for the earlier installer-input defect only. The original b1r9 ZIP lacks required Qt resources, so do not use installer-only packaging for a working release; rebuild from the full b1r13 source workflow.
 
 # Troubleshooting
 

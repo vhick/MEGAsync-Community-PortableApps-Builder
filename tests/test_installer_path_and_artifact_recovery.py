@@ -39,7 +39,12 @@ class SharedActionRunningExeTests(unittest.TestCase):
     def test_pinned_windows_relative_path_is_accepted(self):
         with TemporaryDirectory() as d:
             stage = create_stage(d)
-            self.assertEqual(mod.validate(stage, r'App\MEGAsync\MEGAsync.exe'), stage / 'App' / 'MEGAsync' / 'MEGAsync.exe')
+            # Hosted Windows runners can expose the same file using DOS 8.3
+            # (RUNNER~1) and long (runneradmin) directory-name aliases.
+            # Use file identity, not a fragile raw-path string comparison.
+            actual = mod.validate(stage, r'App\MEGAsync\MEGAsync.exe')
+            expected = stage / 'App' / 'MEGAsync' / 'MEGAsync.exe'
+            self.assertTrue(actual.samefile(expected))
 
     def test_forward_slashes_rejected(self):
         with TemporaryDirectory() as d:

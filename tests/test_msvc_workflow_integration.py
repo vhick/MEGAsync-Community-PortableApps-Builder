@@ -10,7 +10,7 @@ class CompilerAdapterWorkflowTests(unittest.TestCase):
     def test_real_probe_runs_after_qt_before_vcpkg(self):
         data = WORKFLOW.read_text(encoding='utf-8')
         source_patch = data.index('      - name: Patch MEGA configuration directory at source (fail closed)')
-        qt_install = data.index('      - name: Install verified-route Qt 5.15.2 and build helpers')
+        qt_install = data.index('      - name: Install verified-route Qt 5.15.2')
         adaptive = data.index('      - name: Detect Qt/MSVC compatibility using real C++ compile probes')
         vcpkg = data.index('      - name: Resolve and record vcpkg dependency manager identity')
         actual_build = data.index('      - name: Build actual MEGA Desktop application from pinned source')
@@ -29,7 +29,7 @@ class CompilerAdapterWorkflowTests(unittest.TestCase):
         self.assertIn('out/compiler-compatibility.json', data)
         stage = (ROOT / 'scripts/stage.py').read_text(encoding='utf-8')
         self.assertIn('COMPILER-COMPATIBILITY.json', stage)
-        self.assertIn("REV='b1r12'", stage)
+        self.assertIn("REV='b1r13'", stage)
 
 
 if __name__ == '__main__':

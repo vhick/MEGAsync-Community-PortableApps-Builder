@@ -1,23 +1,17 @@
-# GitHub Desktop commit — b1r12
+# GitHub Desktop commit — b1r13
 
-Summary:
+**Commit summary**
 
-`Fix MEGAsync missing Qt resources and embed launcher icon - b1r12`
+`Fix Windows CI test dependencies and path aliases - b1r13`
 
-Description:
+**Commit description**
 
-```text
-Fix the user-confirmed resource loading error by packaging all five source-built Qt .rcc files alongside MEGAsync.exe.
+Fix two b1r12 pre-build test failures seen on the GitHub-hosted Windows runner.
 
-Discover resource targets from upstream gui.cmake and validate their binary headers, sizes, source hashes, package hashes and manifest before installer generation.
+Install the pinned Python dependencies, including Pillow and aqtinstall, before running tests. Verify both imports and avoid a duplicate dependency-install step.
 
-Prevent packaging-only from recycling older broken ZIPs missing these required resources.
+Correct installer-path regression tests to compare file identity with `Path.samefile()` rather than text representations of the Windows `RUNNER~1` 8.3 alias and `runneradmin` long directory name.
 
-Embed a consistent original community cloud icon into the compiled root launcher and AppInfo without copying MEGA trademarked artwork.
+Add five Windows bootstrap regression tests. Retain the b1r12 fixes for all five MEGAsync Qt `.rcc` files and the embedded community launcher icon, as well as the verified adaptive Qt/MSVC, WinRT, vcpkg and shared-action integrations.
 
-Add early post-build resource checks and regression tests. Preserve the prior Qt/MSVC, WinRT, vcpkg, data redirection, launcher, custom-NSIS and release publisher implementations.
-
-Update builder/package revision to b1r12.
-```
-
-Extract kit at repository root, keeping `.github/` contents, commit and push. Run the full **source build**, not packaging-only against the broken b1r11 ZIP. Keep `publish_release=false` until actual Windows runtime acceptance and legal review.
+Update the builder and output revision to b1r13. Keep release publication off pending real Windows runtime acceptance.

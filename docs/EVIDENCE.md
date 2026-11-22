@@ -1,3 +1,7 @@
+## 22 November 2026 b1r12 Windows test failure and b1r13 correction
+
+**USER-SUPPLIED WINDOWS CI EVIDENCE:** `logs_121755836431.zip` shows 80 tests executed, 2 failures in the first fixture-test step: (1) Windows short `RUNNER~1` and long `runneradmin` aliases compared with `Path.__eq__` despite being the same file; (2) `scripts/make_icons.py` requires Pillow, but dependency installation happened after the tests and raised `ModuleNotFoundError`. This run reached no upstream checkout or real application build. b1r13 moves pinned dependency installation before tests, verifies Pillow/aqt imports, uses filesystem identity comparison in the test, and adds five regression tests. These changes are STATIC-VALIDATED locally; full Windows CI and runtime operation remain NOT YET VERIFIED.
+
 ## b1r11 runtime failure observed on Windows (22 November 2026)
 
 **USER-CONFIRMED:** b1r11 finished building and appeared in PortableApps Platform; a user-run MEGAsync process exited after showing "Error loading application resources". The attached `MEGAsync.log` explicitly reported four missing binary Qt resources: `Resources_common.rcc`, `Resources_qml.rcc`, `qml.rcc`, and `Resources_dark.rcc`. Upstream gui.cmake also generates `Resources_light.rcc`. This means the earlier *structural ZIP validation passed a package that was functionally incomplete.* No successful login, sync, or runtime data isolation has been established.
