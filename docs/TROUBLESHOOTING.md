@@ -1,3 +1,9 @@
+## Icon still shows the old blue cloud after b1r14
+
+The PortableApps menu reads `App/AppInfo/appicon_16.png`, `appicon_32.png` and `appicon.ico`. The b1r14 source now generates a distinctive red MP icon and embeds its ICO in the root launcher. After replacing the portable application package, choose **PortableApps menu → Apps → Refresh App Icons**; restart the menu if Windows still caches the old icon. Verify you are running the new root `MEGAsyncPortable.exe`, not the old shortcut or a second copy of the folder. Icon-only builds preserve `App/MEGAsync/` binaries and `Data/` by design.
+
+The official trademarked MEGA logo cannot be assumed redistributable under the MEGAsync source licence. The original community icon is not a copy of that artwork.
+
 ## b1r12 Windows CI tests fail before compilation (two failures)
 
 The actual runner log `logs_121755836431.zip` failed 2 of 80 pre-build tests:

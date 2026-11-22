@@ -1,17 +1,13 @@
-# GitHub Desktop commit — b1r13
+# GitHub Desktop commit — b1r14
 
-**Commit summary**
+**Summary**
 
-`Fix Windows CI test dependencies and path aliases - b1r13`
+`Replace generic cloud with red portable icon and add icon-only rebuild - b1r14`
 
-**Commit description**
+**Description**
 
-Fix two b1r12 pre-build test failures seen on the GitHub-hosted Windows runner.
+Replace the original generic blue cloud with a distinctive red MP community icon in both the PortableApps menu and compiled launcher. Generate all PortableApps PNG sizes and the full Windows multiresolution ICO. Verify the launcher/menu ICO assets agree.
 
-Install the pinned Python dependencies, including Pillow and aqtinstall, before running tests. Verify both imports and avoid a duplicate dependency-install step.
+Add an opt-in icon-only GitHub Actions workflow that downloads an original verified successful source-build ZIP, compiles only the C++ launcher, preserves MEGAsync application files byte-for-byte, regenerates the ZIP and custom-NSIS installer, and keeps publication disabled by default.
 
-Correct installer-path regression tests to compare file identity with `Path.samefile()` rather than text representations of the Windows `RUNNER~1` 8.3 alias and `runneradmin` long directory name.
-
-Add five Windows bootstrap regression tests. Retain the b1r12 fixes for all five MEGAsync Qt `.rcc` files and the embedded community launcher icon, as well as the verified adaptive Qt/MSVC, WinRT, vcpkg and shared-action integrations.
-
-Update the builder and output revision to b1r13. Keep release publication off pending real Windows runtime acceptance.
+Preserve b1r13 application compilation, Qt resources, portable-data handling, vcpkg and WinRT compatibility, installer and publisher integration. Update revision to b1r14 and add regression tests. This is an unofficial community build; MEGA trademark artwork is not distributed.

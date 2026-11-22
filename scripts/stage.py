@@ -1,6 +1,6 @@
 """Assemble and independently validate the source-built PortableApps ZIP."""
 import argparse, hashlib, json, pathlib, re, shutil, subprocess, sys, zipfile
-ROOT='MEGAsyncPortable'; REV='b1r13'
+ROOT='MEGAsyncPortable'; REV='b1r14'
 EXPECTED_RCC = ('Resources_common.rcc','Resources_qml.rcc','Resources_light.rcc','Resources_dark.rcc','qml.rcc')
 RESOURCE_MANIFEST = f'{ROOT}/Other/Source/RCC-RESOURCE-MANIFEST.json'
 def sha256(p):
@@ -123,6 +123,11 @@ def main():
             shutil.copy2(worker,app/worker.name)
     if not (app/'platforms'/'qwindows.dll').is_file():raise RuntimeError('Qt platform plugin missing after deployment')
     subprocess.run([sys.executable,str(pathlib.Path(__file__).with_name('make_icons.py')),str(info)],check=True)
+    # Byte identity between menu icon and the .ico used to compile the launcher.
+    # This prevents future revisions from displaying different launcher/menu art.
+    launcher_icon=pathlib.Path(__file__).parents[1]/'launcher'/'appicon.ico'
+    if not launcher_icon.is_file() or sha256(launcher_icon)!=sha256(info/'appicon.ico'):
+        raise RuntimeError('PortableApps icon differs from compiled launcher input icon')
     (info/'appinfo.ini').write_text(f'''[Format]
 Type=PortableApps.comFormat
 Version=3.5

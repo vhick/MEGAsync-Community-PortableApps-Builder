@@ -275,7 +275,7 @@ jobs:
           engine: custom-nsis
           running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
-          package-revision: b1r13
+          package-revision: b1r14
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -316,8 +316,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r13-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r13
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r14-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r14
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -332,8 +332,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r13-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r13
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r14-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r14
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -343,7 +343,7 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r13-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r14-unpublished
           path: |
             out/*.zip
             out/installers/*.exe
