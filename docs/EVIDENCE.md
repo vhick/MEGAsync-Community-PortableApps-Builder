@@ -1,4 +1,14 @@
-## b1r10 packaging-only provenance rejection / b1r11 correction (22 November 2026)
+## b1r11 runtime failure observed on Windows (22 November 2026)
+
+**USER-CONFIRMED:** b1r11 finished building and appeared in PortableApps Platform; a user-run MEGAsync process exited after showing "Error loading application resources". The attached `MEGAsync.log` explicitly reported four missing binary Qt resources: `Resources_common.rcc`, `Resources_qml.rcc`, `qml.rcc`, and `Resources_dark.rcc`. Upstream gui.cmake also generates `Resources_light.rcc`. This means the earlier *structural ZIP validation passed a package that was functionally incomplete.* No successful login, sync, or runtime data isolation has been established.
+
+**SOURCE-INSPECTED:** `src/MEGASync/gui/gui.cmake` for `v6.7.1.0_Win` declares `qt5_add_binary_resources` for all five resources and copies them beside the compiled MEGAsync.exe using POST_BUILD. `scripts/stage.py` in b1r11 copied only the EXE. `launcher/CMakeLists.txt` did not embed a Win32 icon, and community artwork was used for AppInfo. Source: https://github.com/meganz/MEGAsync/blob/v6.7.1.0_Win/src/MEGASync/gui/gui.cmake
+
+**STATIC-VALIDATED (b1r12 fixture tests):** Resource discovery, exact-output selection, copying, SHA-256 manifest, corruption/missing-file failure, mandatory ZIP contents, icon build wiring and asset generation. A new Windows run is required for actual RCC asset integrity and the embedded Win32 icon check. Official logo is not used without separate trademark permission.
+
+---
+
+## b1r10 packaging-only provenance rejection / b1r12 correction (22 November 2026)
 
 **FAILED/BLOCKED (real GitHub Actions run, user-provided log):**
 `logs_121744908397.zip` records `SOURCE_RUN_ID=44918203381`,
@@ -10,7 +20,7 @@ REST run `path` is `.github/workflows/build-portableapps.yml@main`.
 Original ZIP download/hash validation and NSIS installer generation were NOT
 reached. The checksum is not independently validated by this failed run.
 
-**STATIC-VALIDATED (b1r11 local fixtures):** Added exact run/workflow identity
+**STATIC-VALIDATED (b1r12 local fixtures):** Added exact run/workflow identity
 verification against GitHub API responses including ID, repository, relative
 path, manual-dispatch event and completed state, without weakening the original
 SHA, artifact-name, source identity or package checks. GitHub API acceptance,
@@ -23,7 +33,7 @@ User-supplied `logs_121571335574.zip` confirms MEGAsync application x64 source c
 
 b1r10 uses Windows-style `App\MEGAsync\MEGAsync.exe`, adds source-input preflight, and permits same-run repository artifact recovery without recompiling upstream. These changes have local fixture validation only until next hosted Windows run.
 
-# Evidence and verification matrix — kit b1r11
+# Evidence and verification matrix — kit b1r12
 
 | Stage | Latest supported status |
 |---|---|

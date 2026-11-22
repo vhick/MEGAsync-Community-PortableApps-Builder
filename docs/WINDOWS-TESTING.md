@@ -1,3 +1,5 @@
+Before login, verify `App\MEGAsync` contains all five `.rcc` files and `Other\Source\RCC-RESOURCE-MANIFEST.json` lists their SHA-256 checksums. Check `MEGAsyncPortable.exe` shows the same community icon in Windows Explorer and the PortableApps Platform. If application resources fail to load, do NOT create or modify live sync jobs; collect logs and verify the packaged files.
+
 # Manual Windows acceptance procedure (required before use or publication)
 
 Use a disposable Windows 10/11 test profile and a test MEGA account with **unimportant** files. Before testing, back up all local and cloud folders. Do not validate a brand-new build against production sync data.

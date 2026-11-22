@@ -1,4 +1,4 @@
-# MEGA Desktop Community PortableApps Builder Kit — b1r11 (experimental, NOT yet runtime verified)
+# MEGA Desktop Community PortableApps Builder Kit — b1r12 (experimental, NOT yet runtime verified)
 
 **Mode:** PORTABLEAPPS only. **Upstream:** https://github.com/meganz/MEGAsync. This repository is an INDEPENDENT, community source-build project and is not affiliated with or endorsed by MEGA Limited or PortableApps.com.
 
@@ -7,18 +7,30 @@
 ## What is included
 
 - `.github/workflows/build-portableapps.yml`: independent official-tag discovery, pinned upstream source + SDK checkout, exact source data path patch, vcpkg/Qt setup, actual app source build, genuine MSVC C++ root launcher, completed PortableApps folder and validated ZIP, shared installer, dry-run, optional publication.
-- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation. Source-run provenance is checked against GitHub workflow metadata (corrected in b1r11).
+- `.github/workflows/packaging-only.yml`: reuses a **known, independently validated ZIP** from either a prior builder release or a verified failed-installer GitHub Actions run in this repository, with mandatory independent SHA-256 verification and no upstream recompilation. Source-run provenance is checked against GitHub workflow metadata (corrected in b1r12).
 - `launcher/main.cpp` and `launcher/CMakeLists.txt`: real compiled Win64 launcher with pre-launch portable profile, job child tracking and simultaneous installed MEGA process guard. No host registry cleanup and no fake EXE.
 - `scripts/detect_msvc_qt_compat.py` and `scripts/qt_msvc_probe/`: real MSVC `/WX` compiler probes using the downloaded Qt SDK and Qt's `QList<QString>::operator==`. Leave the target unchanged when compatible; apply a verified fix only after diagnosing the exact known STL4043 failure.
 - `scripts/patch_msvc_qt_compat.py`: target-only, fail-closed compatibility adapter called **conditionally by the Qt probe**, never unconditionally by the workflow.
 - `scripts/ensure_winrt_link.py`, `scripts/winrt_link_probe/`, and `scripts/patch_winrt_link.py`: Windows SDK C++/WinRT **compile + link** preflight, target-private `WindowsApp` linkage when verified necessary, and failure diagnostics before expensive vcpkg work.
 - `scripts/patch_source.py`: fail-closed source adapter for `src/MEGASync/MegaApplication.cpp` `loadDataPath()`; preserves MEGA's native profile ACL routine. Does not tamper with installed MEGA data.
 - `scripts/resolve.py`: numeric Windows stable-release selection; rejects RC/prereleases, non-Windows tags, drafts and missing requested versions.
-- `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons (not MEGA artwork), Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
+- `scripts/stage.py`, `scripts/make_icons.py`, `scripts/packaging_only.py`: genuine PE tests, original community icons embedded in launcher and AppInfo (not MEGA artwork), verified RCC runtime resources, Qt deployment, vcpkg DLL packaging, layout and ZIP validation, SHA-256 and provenance.
 - `scripts/verify_vcpkg_path.py`: fail early if Windows MSBuild dependency paths are too long.
 - `scripts/verify_vcpkg_checkout.py`: require a full-history, non-partial vcpkg checkout before CMake configure; catches incomplete version-tree checkouts early.
 - `tests/`: deterministic **static/fixture** tests covering dynamic preflight decisions, compiler source patching, workflow integration, vcpkg checkout, and regression safety. These are not Windows MSVC, GUI or portability acceptance tests.
 - `docs/`: audit, licensing, procedure, limitations, release safety and Windows acceptance checklist.
+
+## b1r12: fix confirmed missing runtime Qt resources and embed launcher icon (22 November 2026)
+
+**USER-OBSERVED FAILURE:** Source-built b1r11 ran far enough to show MEGA's "Error loading application resources" screen. The supplied `MEGAsync.log` lists `Resources_common.rcc`, `Resources_qml.rcc`, `qml.rcc` and `Resources_dark.rcc` absent beside `App/MEGAsync/MEGAsync.exe`. Upstream also requires `Resources_light.rcc`. The Qt resource generation is defined in upstream `src/MEGASync/gui/gui.cmake`; CMake already copies all five outputs next to the compiled application, but earlier `scripts/stage.py` did not stage them.
+
+**FIX:** Discover the generated resources from the exact tagged source CMake, require the five known resources, copy from the *same compiled executable output directory*, verify every RCC's `qres` magic, size, SHA-256, and ZIP member inventory. Stage `Other/Source/RCC-RESOURCE-MANIFEST.json`; validate its hashes before the installer. The independent source-build step now rejects missing RCC files earlier. The packaging-only workflow intentionally rejects old b1r9/b1r11 ZIPs that contain a compiled application without required resources; making an installer from those ZIPs cannot repair the runtime failure.
+
+**ICON:** Embed the existing original community cloud icon into the compiled Win32 launcher using `launcher/portable_icon.rc`, pre-generate its .ico before compiling, and verify Windows RT_GROUP_ICON. Use the matching icon in AppInfo. The official MEGA logo is *not* used: upstream `LICENCE.md` section 3.1 does not grant rights to MEGA trademarks, even for a community source build. No branding permission or official endorsement is claimed.
+
+**REQUIRED NEXT ACTION:** Run the **full source-build workflow** with `publish_release=false`; do NOT run packaging-only against the older missing-resource ZIP. Preserve `Data/` when upgrading; test startup with a disposable account and harmless sync folders before trusting important files.
+
+**EVIDENCE:** b1r12 changes are locally testable. They are NOT YET verified by a new GitHub Windows compilation or interactive Windows runtime test.
 
 ## b1r11: fix false source-run rejection in packaging-only recovery (22 Nov 2026)
 
@@ -45,7 +57,7 @@ Windows re-run.
 
 **Repackage settings:** Leave `source_release_tag` blank; use
 `source_run_id=44918203381`; paste the exact `original_zip_sha256` from
-`ZIP-SHA256.txt`; leave `installer_package_revision=b1r11` and
+`ZIP-SHA256.txt`; leave `installer_package_revision=b1r12` and
 `publish_release=false`. Do not use the outer GitHub artifact digest.
 
 ## b1r10: Windows build success, shared-installer path correction and fast recovery (22 Nov 2026)

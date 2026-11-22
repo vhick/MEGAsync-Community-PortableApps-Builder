@@ -226,11 +226,17 @@ jobs:
       - name: Build genuine C++ Windows PE portable launcher
         shell: pwsh
         run: |
+          # The same original, non-MEGA icon is used in the compiled PE and
+          # PortableApps menu. The icon is generated before RC compilation.
+          python scripts/make_icons.py launcher
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'launcher/appicon.ico')) { throw 'Portable launcher icon generation failed' }
           cmake -G 'Visual Studio 17 2022' -A x64 -S launcher -B launcher-build
           if ($LASTEXITCODE -ne 0) { throw 'Launcher configure failed' }
           cmake --build launcher-build --config Release --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed' }
           if (-not (Test-Path 'launcher-build/Release/MEGAsyncPortable.exe')) { throw 'No genuine launcher binary produced' }
+          python scripts/verify_launcher_icon.py --launcher launcher-build/Release/MEGAsyncPortable.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Compiled launcher is missing its embedded menu icon resource' }
 
       - name: Stage and independently validate ZIP before installer
         shell: pwsh
@@ -260,7 +266,7 @@ jobs:
           engine: custom-nsis
           running-exe: 'App\MEGAsync\MEGAsync.exe'
           timeout-seconds: '900'
-          package-revision: b1r11
+          package-revision: b1r12
 
       - name: Validate shared installer independently
         if: steps.installer.outcome == 'success'
@@ -301,8 +307,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r11-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r11
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r12-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r12
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -317,8 +323,8 @@ jobs:
             out/installers/*.exe
             out/compiler-compatibility.json
             out/winrt-link-compatibility.json
-          tag: mega-portable-v${{ env.APP_VERSION }}-b1r11-${{ env.UPSTREAM_SHA }}
-          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r11
+          tag: mega-portable-v${{ env.APP_VERSION }}-b1r12-${{ env.UPSTREAM_SHA }}
+          release-title: MEGA Desktop Community Portable ${{ env.APP_VERSION }} b1r12
           tag-prefix: mega-portable-
           keep-releases: '3'
           prune: 'false'
@@ -328,7 +334,7 @@ jobs:
         if: inputs.publish_release != true
         uses: actions/upload-artifact@v4
         with:
-          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r11-unpublished
+          name: MEGAsyncPortable-${{ env.APP_VERSION }}-b1r12-unpublished
           path: |
             out/*.zip
             out/installers/*.exe

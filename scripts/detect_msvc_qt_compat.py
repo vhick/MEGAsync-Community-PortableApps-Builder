@@ -17,7 +17,7 @@ from typing import Callable
 
 from patch_msvc_qt_compat import patch as apply_target_patch
 
-REVISION = 'b1r11'
+REVISION = 'b1r12'
 RELATIVE_PROJECT = Path('scripts/qt_msvc_probe')
 KNOWN_WARNING = re.compile(r'(?i)STL4043')
 KNOWN_DEPRECATION = re.compile(r'(?i)checked_array_iterator')

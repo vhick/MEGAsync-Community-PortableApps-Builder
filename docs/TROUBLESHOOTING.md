@@ -1,10 +1,20 @@
+## Runtime: "Error loading application resources" (b1r11 and earlier)
+
+The user-observed MEGAsync log contains `Missing resource file` for `Resources_common.rcc`, `Resources_qml.rcc`, `qml.rcc`, and `Resources_dark.rcc`. Upstream also builds `Resources_light.rcc`. b1r12 copies all five source-built .rcc files from the compiled executable folder to `App/MEGAsync` and checks their `qres` magic and SHA-256. This must not be confused with windeployqt: Qt framework DLL deployment alone is insufficient.
+
+Old b1r9/b1r11 ZIPs cannot be repaired by running the packaging-only workflow unchanged. Build a fresh b1r12 full source ZIP, preserve the existing portable `Data`, and test with disposable sync folders. Do not copy app resources from a different version or delete the MEGA profile to conceal the problem.
+
+## Menu and launcher icon
+
+Earlier kits generated a neutral cloud icon only for AppInfo, so the compiled launcher had no embedded icon. b1r12 generates the same original community icon before Windows resource compilation and checks RT_GROUP_ICON. MEGA's code licence excludes rights to use its logo or trademarks: original community artwork remains intentionally distinct from the official MEGA icon.
+
 ## b1r10 packaging-only incorrectly rejects the source run ID
 
 The uploaded `logs_121744908397.zip` confirms that `source_run_id=44918203381`,
 `installer_package_revision=b1r10`, and a 64-character ZIP SHA-256 were received.
 The workflow rejected the run at its provenance check because its regex required
 `/.github/...` even though GitHub returns `.github/...@main`. This is not a
-checksum failure. b1r11 uses `scripts/verify_source_run.py` to check the
+checksum failure. b1r12 uses `scripts/verify_source_run.py` to check the
 relative workflow path, repository, original run ID, manual event and canonical
 numeric workflow ID. Keep the exact SHA-256 and run ID; choose packaging-only.
 

@@ -99,6 +99,15 @@ class SharedActionRunningExeTests(unittest.TestCase):
                 'MEGAsyncPortable/Other/Source/BUILD-IDENTITY.json': identity.encode(),
                 'MEGAsyncPortable/Data/': b'',
             }
+            # The previous b1r9 ZIP is no longer accepted as runtime-ready:
+            # a complete ZIP must carry all five verified Qt binary resources.
+            runtime_resource=b'qres'+bytes(range(64))
+            resource_rows=[]
+            for name in ('Resources_common.rcc','Resources_qml.rcc','Resources_light.rcc','Resources_dark.rcc','qml.rcc'):
+                members['MEGAsyncPortable/App/MEGAsync/'+name]=runtime_resource
+                resource_rows.append({'name':name,'size':len(runtime_resource),
+                                      'sha256':hashlib.sha256(runtime_resource).hexdigest()})
+            members['MEGAsyncPortable/Other/Source/RCC-RESOURCE-MANIFEST.json']=json.dumps({'resources':resource_rows}).encode()
             with zipfile.ZipFile(srczip, 'w') as z:
                 for name, raw in members.items():
                     z.writestr(name, raw)
